@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MemoBand – Dementia Care Smartwatch Prototype</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#eef1f4;color:#1b2430;font-size:14px}
+header{padding:14px 20px;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header h1{font-size:20px;margin:0}
+header small{color:#5b6775;display:block;font-weight:400;font-size:12px}
+.ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.clock{font-variant-numeric:tabular-nums;font-weight:700;background:#fff;border:1px solid #d5dce4;border-radius:10px;padding:6px 12px}
+button{font:inherit;cursor:pointer}
+.sb{border:1px solid #c9d2dc;background:#fff;border-radius:8px;padding:6px 10px;color:#1b2430}
+.sb:hover{background:#f1f5f9}.sb.on{background:#0f766e;color:#fff;border-color:#0f766e}
+.layout{display:grid;grid-template-columns:350px minmax(380px,1fr) 340px;gap:16px;padding:0 16px 24px;align-items:start}
+@media(max-width:1150px){.layout{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid #dde3ea;border-radius:14px;padding:14px}
+.card h3{margin:0 0 8px;font-size:15px}
+.card h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#5b6775}
+/* watch */
+.watchwrap{position:sticky;top:8px}
+.watch{width:310px;margin:28px auto;background:#23272e;border-radius:66px;padding:26px 20px;box-shadow:0 12px 30px rgba(0,0,0,.25),inset 0 0 0 3px #3a404a;position:relative}
+.watch:before,.watch:after{content:"";position:absolute;left:70px;right:70px;height:34px;background:#2f343c;z-index:-1}
+.watch:before{top:-24px;border-radius:14px 14px 0 0}.watch:after{bottom:-24px;border-radius:0 0 14px 14px}
+.wscreen{background:#0b1220;color:#fff;border-radius:44px;height:350px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+#wbody{flex:1;overflow-y:auto;padding:16px 15px 8px;scrollbar-width:none}
+#wbody::-webkit-scrollbar{display:none}
+.sosbar{border:0;background:#dc2626;color:#fff;font-weight:800;font-size:17px;letter-spacing:.08em;padding:11px;margin:0 22px 14px;border-radius:22px}
+.sosbar:active{background:#991b1b}
+.wh{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wh b{font-size:17px}
+.back{background:#1f2a40;color:#fff;border:0;border-radius:50%;width:32px;height:32px;font-size:16px}
+.bigtime{font-size:46px;font-weight:800;text-align:center;line-height:1;margin:4px 0}
+.sub{text-align:center;color:#9fb0c8;font-size:13px}
+.chip{display:inline-block;background:#16233a;border-radius:20px;padding:4px 10px;font-size:12px;margin:3px 0;color:#cfe0f7}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.gb{background:#16233a;border:0;color:#fff;border-radius:18px;padding:12px 4px;font-size:13px;font-weight:600}
+.gb span{display:block;font-size:24px;margin-bottom:2px}
+.gb:active{background:#223657}
+.row{display:flex;align-items:center;gap:9px;background:#14203a;border-radius:14px;padding:9px 10px;margin-bottom:7px;font-size:14px}
+.row .t{color:#8fa5c6;font-size:12px;min-width:54px}
+.row.done{opacity:.45;text-decoration:line-through}
+.row .grow{flex:1}
+.wbtn{display:block;width:100%;border:0;border-radius:16px;padding:12px;font-size:16px;font-weight:700;margin-top:8px;color:#fff;background:#0f766e}
+.wbtn.alt{background:#2b3a57}.wbtn.red{background:#dc2626}.wbtn.sm{padding:8px;font-size:13px}
+.ov{position:absolute;inset:0;background:#0b1220;padding:20px 18px;overflow-y:auto;z-index:5;text-align:center;scrollbar-width:none}
+.ov .ic{font-size:54px;margin-top:6px}.ov h2{margin:6px 0;font-size:22px}.ov p{margin:4px 0;color:#c4d3ea;font-size:15px}
+.pulse{animation:pulse 1s infinite}@keyframes pulse{50%{transform:scale(1.12)}}
+.shake{animation:shake .5s infinite}@keyframes shake{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+.bignum{font-size:40px;font-weight:800;color:#fb7185}
+.chat{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.bub{padding:8px 11px;border-radius:14px;font-size:14px;max-width:92%;line-height:1.35}
+.bub.ai{background:#16233a;align-self:flex-start}.bub.me{background:#0f766e;align-self:flex-end}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+.chips button{background:#1f2a40;color:#cfe0f7;border:0;border-radius:14px;padding:5px 9px;font-size:12px}
+.winput{display:flex;gap:5px}
+.winput input{flex:1;min-width:0;border-radius:12px;border:1px solid #2b3a57;background:#0f1a2e;color:#fff;padding:7px;font:inherit;font-size:13px}
+.winput button{border:0;background:#0f766e;color:#fff;border-radius:12px;padding:0 10px}
+.winput button.on{background:#dc2626}
+.hr{font-size:44px;font-weight:800;color:#fb7185;text-align:center;line-height:1}
+.hr small{font-size:14px;color:#9fb0c8;font-weight:500}
+.bar{height:10px;border-radius:6px;background:#1c2a44;overflow:hidden;margin:4px 0 8px}.bar i{display:block;height:100%;background:#34d399}
+.kv{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #1c2a44}
+.badge{display:inline-block;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700}
+.g{background:#065f46;color:#d1fae5}.a{background:#92400e;color:#fef3c7}.r{background:#991b1b;color:#fee2e2}
+.note{font-size:13px;color:#c4d3ea;background:#14203a;border-radius:12px;padding:9px;margin-top:8px;line-height:1.4}
+.opt{display:block;width:100%;text-align:left;border:0;background:#1f2a40;color:#fff;border-radius:14px;padding:10px;margin-top:6px;font-size:15px}
+.opt.ok{background:#065f46}.opt.no{background:#7f1d1d}
+.wscreen input[type=time],.wscreen select{width:100%;border-radius:10px;border:1px solid #2b3a57;background:#0f1a2e;color:#fff;padding:8px;font:inherit;margin-bottom:6px}
+.wscreen input[type=text]{width:100%;border-radius:10px;border:1px solid #2b3a57;background:#0f1a2e;color:#fff;padding:8px;font:inherit;margin-bottom:6px}
+/* camera / care */
+.cam{background:#0e1621;border-radius:12px;padding:8px;position:relative}
+.cam .tag{position:absolute;top:14px;left:16px;color:#fca5a5;font-size:11px;font-weight:700;letter-spacing:.06em}
+.cam .tag:before{content:"● ";animation:blink 1.2s infinite}@keyframes blink{50%{opacity:.2}}
+svg text{font-family:inherit}
+.sim{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.sim select{width:100%;padding:6px;border-radius:8px;border:1px solid #c9d2dc}
+.sim .full{grid-column:1/-1}
+.ev{max-height:170px;overflow:auto;font-size:13px}
+.ev div{padding:4px 0;border-bottom:1px solid #eef1f4}.ev span{color:#5b6775;font-variant-numeric:tabular-nums;margin-right:6px}
+.al{border-left:4px solid #94a3b8;background:#f8fafc;padding:7px 9px;margin-bottom:6px;border-radius:6px;font-size:13px}
+.al.warn{border-color:#f59e0b;background:#fffbeb}.al.sos{border-color:#dc2626;background:#fef2f2}.al.ok{border-color:#16a34a;background:#f0fdf4}
+.al b{display:block}.al span{color:#5b6775;font-size:12px}
+.sosb{background:#dc2626;color:#fff;border-radius:10px;padding:10px;margin-bottom:10px;animation:pulse2 1s infinite}
+@keyframes pulse2{50%{background:#991b1b}}
+.sosb button{margin-top:6px;background:#fff;border:0;border-radius:8px;padding:6px 12px;font-weight:700;color:#991b1b}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat div{background:#f1f5f9;border-radius:8px;padding:7px 9px;font-size:12px;color:#5b6775}.stat b{display:block;font-size:17px;color:#1b2430}
+.care input,.care textarea{width:100%;padding:6px 8px;border:1px solid #c9d2dc;border-radius:8px;font:inherit;margin-bottom:5px}
+.care label{font-size:12px;color:#5b6775}
+.pose{display:flex;gap:10px;align-items:center}
+.pose .m{flex:1;font-size:13px}
+.disc{font-size:12px;color:#5b6775;padding:0 18px 20px;max-width:1100px}
+
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;background:#0a0f1a}
+.top{height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;color:#e2e8f0}
+.top .clock{background:#16233a;border-color:#2b3a57;color:#e2e8f0}
+#stage{display:flex;justify-content:center;overflow:hidden}
+.watch{margin:0!important;width:310px;padding:14px 12px!important;border-radius:56px!important;transform-origin:top center;flex:none}
+.watch:before,.watch:after{display:none!important}
+.wscreen{height:var(--h,420px)!important;border-radius:44px!important}
+#drawer{position:fixed;left:0;right:0;bottom:0;max-height:82vh;overflow-y:auto;background:#fff;border-radius:18px 18px 0 0;padding:14px;transform:translateY(105%);transition:transform .25s;z-index:50;box-shadow:0 -8px 30px rgba(0,0,0,.4)}
+#drawer.open{transform:none}
+.dh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.dh small{font-weight:400;color:#5b6775}
+.dn{font-size:12px;color:#5b6775;margin:4px 0 10px}
+#drawer h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#5b6775}
+</style>
+</head>
+<body>
+<div class="top"><b>MemoBand</b><span class="clock" id="clock">--</span><button class="sb" onclick="toggleDrawer()">🛠 Demo</button></div>
+<div id="stage"><div class="watch" id="watch"><div class="wscreen"><div id="wbody"></div><button class="sosbar" onclick="startSOS()">SOS</button></div></div></div>
+
+<div id="drawer">
+  <div class="dh"><b>Demo controls <small>(not part of the watch)</small></b><button class="sb" onclick="toggleDrawer()">✕ Close</button></div>
+  <p class="dn">The watch gets its data from home cameras and sensors. Use these controls to simulate them.</p>
+  <div class="ctl" style="margin-bottom:8px">
+    <button class="sb on" data-sp="1" onclick="setSpeed(1)">1×</button>
+    <button class="sb" data-sp="5" onclick="setSpeed(5)">5×</button>
+    <button class="sb" data-sp="15" onclick="setSpeed(15)">15×</button>
+    <button class="sb" onclick="jumpNext()">⏭ Next reminder</button>
+    <button class="sb on" id="voiceBtn" onclick="toggleVoice()">🔊 Voice on</button>
+  </div>
+  <div class="cam"><span class="tag">LIVE · home cameras</span><div id="plan"></div></div>
+  <div class="sim">
+    <select id="selObj"></select>
+    <select id="selSpot"></select>
+    <button class="sb full" onclick="simPlace()">🚶 Pick item up and put it at that spot</button>
+    <button class="sb" onclick="simWalk()">Walk to spot</button>
+    <button class="sb" id="btnUnsteady" onclick="toggleUnsteady()">Unsteady gait: off</button>
+    <button class="sb" onclick="simFall()">⚠️ Simulate fall</button>
+    <button class="sb" onclick="simMemCheck()">🧠 Memory check</button>
+    <button class="sb" onclick="simWander()">🚪 Wander outside</button>
+    <button class="sb" onclick="simWalkHome()">🧭 Follow directions home</button>
+  </div>
+  <h4>Posture &amp; gait (camera)</h4>
+  <div class="pose"><div id="stick" style="width:100px"></div><div class="m" id="gaitInfo"></div></div>
+  <h4>Camera event log</h4><div class="ev" id="events"></div>
+  <h4>Caregiver phone (simulated) — <span id="guideName"></span></h4>
+  <div id="sosbanner"></div>
+  <div class="stat" id="status"></div>
+  <div id="alerts" style="margin-top:8px"></div>
+  <div class="care">
+    <input id="msg" placeholder="Message to the watch, e.g. Lunch is ready">
+    <button class="sb" onclick="sendMsg()">Send &amp; speak on watch</button>
+    <details style="margin-top:10px"><summary>Patient profile used by the AI</summary>
+      <label>Name</label><input id="pName" onchange="saveProfile()">
+      <label>Age</label><input id="pAge" onchange="saveProfile()">
+      <label>City</label><input id="pCity" onchange="saveProfile()">
+      <label>Home address</label><input id="pAddr" onchange="saveProfile()">
+      <label>Caregiver name</label><input id="pGuide" onchange="saveProfile()">
+      <label>Family (Name - relation, one per line)</label><textarea id="pFam" rows="4" onchange="saveProfile()"></textarea>
+    </details>
+    <h4>Memory check results</h4><div id="quizlog" style="font-size:13px"></div>
+  </div>
+  <p class="dn">Camera, heart rate, steps, gait and GPS are simulated. Not a medical device.</p>
+</div>
+
+<script>
+/* ---------- DATA ---------- */
+const ROOMS={living:{n:'Living room',x:20,y:20,w:280,h:200},kitchen:{n:'Kitchen',x:300,y:20,w:280,h:200},bedroom:{n:'Bedroom',x:20,y:220,w:200,h:180},bath:{n:'Bathroom',x:220,y:220,w:140,h:180},entrance:{n:'Entrance',x:360,y:220,w:220,h:180}};
+const SPOTS={
+  sofa:{n:'Living room sofa',room:'living',x:110,y:140},
+  kcounter:{n:'Kitchen counter',room:'kitchen',x:450,y:70},
+  dtable:{n:'Dining table',room:'kitchen',x:450,y:165},
+  nightstand:{n:'Bedroom nightstand',room:'bedroom',x:70,y:330},
+  shelf:{n:'Bathroom shelf',room:'bath',x:295,y:300},
+  etable:{n:'Entrance table',room:'entrance',x:480,y:300}};
+const OBJ={
+  keys:{n:'Keys',ic:'🔑',spot:'etable',t:500,syn:['key','keys']},
+  glasses:{n:'Glasses',ic:'👓',spot:'nightstand',t:450,syn:['glasses','spectacles','specs']},
+  phone:{n:'Phone',ic:'📱',spot:'sofa',t:485,syn:['phone','mobile']},
+  pills:{n:'Pill box',ic:'💊',spot:'kcounter',t:465,syn:['pill','pills','medicine','medicines','tablet','tablets']},
+  wallet:{n:'Wallet',ic:'👛',spot:'nightstand',t:450,syn:['wallet','purse']}};
+const HUB=[300,220], DOOR=[578,310];
+const ROUTE=[[30,30],[30,120],[150,120],[150,160],[205,160]];
+const STREETS=['Park Road','Green Park','Market Street','your street'];
+const MPX=2; // metres per map pixel
+
+const S={
+  t:525, speed:1, voice:true, screen:'home', overlay:null, q:[], chat:[], quiz:null,
+  profile:{name:'Ahmed Khan',call:'Ahmed',age:72,city:'Lahore',address:'House 12, Street 4, Gulberg',guide:'Sara',
+    family:[{n:'Fatima',r:'wife'},{n:'Sara',r:'daughter'},{n:'Ali',r:'grandson'},{n:'Zara',r:'granddaughter'}]},
+  routine:[
+    {id:1,t:540,label:'Take morning pills',ic:'💊'},{id:2,t:570,label:'Eat breakfast',ic:'🍳'},
+    {id:3,t:660,label:'Drink a glass of water',ic:'💧'},{id:4,t:750,label:'Eat lunch',ic:'🍲'},
+    {id:5,t:900,label:'Short walk in the garden',ic:'🚶'},{id:6,t:1080,label:'Call Sara',ic:'📞'},
+    {id:7,t:1200,label:'Take evening pills',ic:'💊'},{id:8,t:1320,label:'Go to bed',ic:'🛏️'}],
+  nextId:9, steps:1840, goal:4000, hr:72, hrHist:Array(40).fill(72), measuring:0, measured:null,
+  unsteady:false, gaitAlerted:false, walkTicks:0, alerts:[], events:[], quizlog:[], sos:null, lastMemCheck:525,
+  G:{speed:1.05,sym:94,cad:100,lean:5}, sel:null, guideTo:null, cd:null, wander:{prog:0,timer:null}
+};
+S.routine.forEach(r=>{r.done=false;r.fired=false;r.snooze=null;r.escalated=false});
+S.routine.forEach(r=>{if(r.t<S.t){r.done=true;r.fired=true}});
+const PERSON={x:450,y:165,room:'kitchen',mode:'idle',carry:null,path:[],dest:null,speed:85,phase:0};
+Object.values(OBJ).forEach(o=>{o.room=SPOTS[o.spot].room});
+
+/* ---------- HELPERS ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmtT(m){m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mm=m%60,ap=h>=12?'PM':'AM';return ((h%12)||12)+':'+String(mm).padStart(2,'0')+' '+ap}
+function ago(t){const d=S.t-t;if(d<1)return 'just now';if(d<60)return d+' min ago';const h=Math.floor(d/60);return h+(h===1?' hour':' hours')+' ago'}
+function greet(){const h=Math.floor((S.t%1440)/60);return h<12?'Good morning':h<17?'Good afternoon':'Good evening'}
+function rnd(a,b){return a+Math.random()*(b-a)}
+function spotName(id){return 'the '+SPOTS[id].n.toLowerCase()}
+function dayName(i){return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][((i%7)+7)%7]}
+function shuffle(a){return a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1])}
+function pathLen(){let L=0;for(let i=1;i<ROUTE.length;i++)L+=Math.hypot(ROUTE[i][0]-ROUTE[i-1][0],ROUTE[i][1]-ROUTE[i-1][1]);return L}
+function routePos(p){const L=pathLen()*p;let acc=0;for(let i=1;i<ROUTE.length;i++){const a=ROUTE[i-1],b=ROUTE[i],d=Math.hypot(b[0]-a[0],b[1]-a[1]);if(acc+d>=L||i===ROUTE.length-1){const f=Math.min(1,(L-acc)/d);return {x:a[0]+(b[0]-a[0])*f,y:a[1]+(b[1]-a[1])*f,seg:i-1}}acc+=d}}
+function distHome(){return Math.round(pathLen()*(1-S.wander.prog)*MPX)}
+function navStep(){
+  const pos=routePos(S.wander.prog),i=pos.seg,a=ROUTE[i],b=ROUTE[i+1];
+  const rem=Math.round(Math.hypot(b[0]-pos.x,b[1]-pos.y)*MPX);
+  let turn='';
+  if(i+2<ROUTE.length){const c=ROUTE[i+2];const d1=[b[0]-a[0],b[1]-a[1]],d2=[c[0]-b[0],c[1]-b[1]];const cr=d1[0]*d2[1]-d1[1]*d2[0];turn=cr>0?'then turn RIGHT':'then turn LEFT'}else turn='then you are home';
+  return {text:`Walk straight for ${Math.max(5,Math.round(rem/5)*5)} metres along ${STREETS[i]}, ${turn}.`,rem};
+}
+function locText(){return PERSON.mode==='outside'?`Outside · ${distHome()} m from home`:`Home · ${ROOMS[PERSON.room].n}`}
+function profileName(){return S.profile.call}
+function speak(t){
+  if(!S.voice)return;
+  try{if(window.speechSynthesis){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.9;speechSynthesis.speak(u)}}catch(e){}
+}
+let actx=null;
+function beep(n=3){
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    for(let i=0;i<n;i++){const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(actx.destination);o.start(actx.currentTime+i*.3);o.stop(actx.currentTime+i*.3+.15)}}catch(e){}
+}
+function toggleVoice(){S.voice=!S.voice;const b=$('voiceBtn');b.textContent=S.voice?'🔊 Voice on':'🔇 Voice off';b.classList.toggle('on',S.voice);if(S.voice)speak('Voice is on.')}
+function setSpeed(n){S.speed=n;document.querySelectorAll('[data-sp]').forEach(b=>b.classList.toggle('on',+b.dataset.sp===n))}
+
+/* ---------- EVENTS & ALERTS ---------- */
+function logEv(txt){S.events.unshift({t:S.t,txt});if(S.events.length>60)S.events.pop();renderEvents()}
+function addAlert(level,title,detail){S.alerts.unshift({t:S.t,level,title,detail});if(S.alerts.length>40)S.alerts.pop();renderCare()}
+function renderEvents(){$('events').innerHTML=S.events.map(e=>`<div><span>${fmtT(e.t)}</span>${esc(e.txt)}</div>`).join('')||'<div>No events yet.</div>'}
+
+/* ---------- FLOORPLAN ---------- */
+function planSVG(o={}){
+  let s=`<svg viewBox="0 0 600 420" width="100%" style="display:block">`;
+  for(const [id,r] of Object.entries(ROOMS)){
+    const hl=o.hlRoom===id;
+    s+=`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${hl?'#1e3a5f':'#16212f'}" stroke="#3b4a5e" stroke-width="3"/>`;
+    s+=`<text x="${r.x+10}" y="${r.y+20}" fill="#7e90a8" font-size="${o.small?16:13}">${r.n}</text>`;
+  }
+  s+=`<rect x="574" y="290" width="8" height="40" fill="#f59e0b"/><text x="520" y="345" fill="#f59e0b" font-size="${o.small?14:11}">Front door</text>`;
+  const per={};
+  if(o.objects)for(const [id,ob] of Object.entries(OBJ)){
+    if(PERSON.carry===id)continue;
+    const sp=SPOTS[ob.spot];per[ob.spot]=(per[ob.spot]||0)+1;
+    s+=`<text x="${sp.x-12+(per[ob.spot]-1)*22}" y="${sp.y+8}" font-size="${o.small?24:20}">${ob.ic}</text>`;
+  }
+  if(o.spots)for(const sp of Object.values(SPOTS))s+=`<circle cx="${sp.x}" cy="${sp.y+14}" r="3" fill="#475569"/>`;
+  if(o.hl){const sp=SPOTS[o.hl];s+=`<circle cx="${sp.x}" cy="${sp.y}" r="26" fill="none" stroke="#fbbf24" stroke-width="4"><animate attributeName="r" values="20;34;20" dur="1.2s" repeatCount="indefinite"/></circle>`}
+  if(o.route){s+=`<polyline points="${o.route.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#34d399" stroke-width="5" stroke-dasharray="10 8"><animate attributeName="stroke-dashoffset" from="36" to="0" dur="1s" repeatCount="indefinite"/></polyline>`}
+  if(o.person!==false&&PERSON.mode!=='outside'){
+    const fall=PERSON.mode==='fallen';
+    s+=`<g transform="translate(${PERSON.x},${PERSON.y})"><circle r="17" fill="${fall?'#ef4444':'#38bdf8'}" opacity=".25"/><circle r="9" fill="${fall?'#ef4444':'#38bdf8'}" stroke="#fff" stroke-width="2"/>`;
+    if(PERSON.carry)s+=`<text x="8" y="-8" font-size="18">${OBJ[PERSON.carry].ic}</text>`;
+    s+=`</g>`;
+    if(o.you)s+=`<text x="${PERSON.x+14}" y="${PERSON.y+26}" fill="#fff" font-size="13" font-weight="700">You</text>`;
+    else s+=`<rect x="${PERSON.x-24}" y="${PERSON.y-48}" width="48" height="16" rx="3" fill="#38bdf8" opacity=".9" style="display:${o.noBox?'none':'block'}"/><text x="${PERSON.x}" y="${PERSON.y-36}" fill="#04243a" font-size="10" font-weight="700" text-anchor="middle">${esc(S.profile.call)}</text>`;
+  }
+  return s+'</svg>';
+}
+function outdoorSVG(){
+  const pos=routePos(S.wander.prog),H=ROUTE[ROUTE.length-1];
+  let s=`<svg viewBox="0 0 260 190" width="100%" style="display:block;background:#10231d;border-radius:12px">
+  <rect x="45" y="40" width="80" height="60" rx="8" fill="#14532d"/><text x="85" y="74" fill="#86efac" font-size="11" text-anchor="middle">Green Park</text>
+  <rect x="170" y="30" width="70" height="60" rx="6" fill="#1e293b"/><rect x="170" y="130" width="40" height="40" rx="4" fill="#1e293b"/><rect x="60" y="135" width="70" height="40" rx="4" fill="#1e293b"/>
+  <polyline points="${ROUTE.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#34d399" stroke-width="5" stroke-dasharray="9 7"><animate attributeName="stroke-dashoffset" from="32" to="0" dur="1s" repeatCount="indefinite"/></polyline>
+  <text x="${H[0]-4}" y="${H[1]+6}" font-size="22">🏠</text>
+  <circle cx="${pos.x}" cy="${pos.y}" r="8" fill="#38bdf8" stroke="#fff" stroke-width="2"/>
+  <text x="${pos.x+11}" y="${pos.y-8}" fill="#fff" font-size="11" font-weight="700">You</text></svg>`;
+  return s;
+}
+
+/* ---------- WATCH SCREENS ---------- */
+function head(t){return `<div class="wh"><button class="back" onclick="go('home')">‹</button><b>${t}</b></div>`}
+function nextReminder(){
+  const now=S.t%1440;let r=S.routine.filter(x=>!x.done&&x.t>=now).sort((a,b)=>a.t-b.t)[0];
+  if(!r)r=S.routine.slice().sort((a,b)=>a.t-b.t)[0];return r}
+const screens={
+  home(){
+    const d=new Date(),nr=nextReminder();
+    return `<div class="sub">${d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'})}</div>
+    <div class="bigtime">${fmtT(S.t).replace(/ (AM|PM)/,'<span style="font-size:16px"> $1</span>')}</div>
+    <div class="sub">${greet()}, <b style="color:#fff">${esc(profileName())}</b></div>
+    <div style="text-align:center;margin-top:4px"><span class="chip">📍 ${esc(locText())}</span>${nr?`<br><span class="chip">Next: ${fmtT(nr.t)} ${nr.ic} ${esc(nr.label)}</span>`:''}</div>
+    <div class="grid">
+      <button class="gb" onclick="go('routine')"><span>📅</span>My day</button>
+      <button class="gb" onclick="go('find')"><span>🔍</span>Find things</button>
+      <button class="gb" onclick="go('ai')"><span>💬</span>Ask MemoBand</button>
+      <button class="gb" onclick="go('health')"><span>❤️</span>Health</button>
+      <button class="gb" onclick="go('map')"><span>🧭</span>Take me home</button>
+      <button class="gb" onclick="go('quiz')"><span>🧠</span>Memory</button>
+    </div>`},
+  routine(){
+    const rows=S.routine.slice().sort((a,b)=>a.t-b.t).map(r=>`<div class="row ${r.done?'done':''}" onclick="toggleDone(${r.id})"><span class="t">${fmtT(r.t)}</span><span style="font-size:20px">${r.ic}</span><span class="grow">${esc(r.label)}</span><span>${r.done?'✅':'⬜'}</span></div>`).join('');
+    return head('My day')+rows+`<button class="wbtn alt sm" onclick="go('addr')">＋ Add to my day</button>`},
+  addr(){return head('Add reminder')+`<input type="time" id="nt" value="${String(Math.floor(S.t/60)%24).padStart(2,'0')}:${String((S.t+5)%60).padStart(2,'0')}"><input type="text" id="nl" placeholder="What to remember?"><select id="ni"><option>💊</option><option>🍳</option><option>💧</option><option>🚶</option><option>📞</option><option>🌳</option><option>🛁</option><option>⏰</option></select><button class="wbtn" onclick="saveReminder()">Save</button>`},
+  find(){
+    const rows=Object.entries(OBJ).map(([id,o])=>`<div class="row" onclick="selFind('${id}')"><span style="font-size:24px">${o.ic}</span><span class="grow"><b>${o.n}</b><br><span style="font-size:12px;color:#9fb0c8">${SPOTS[o.spot].n} · ${ago(o.t)}</span></span></div>`).join('');
+    let map='';
+    if(S.sel){const o=OBJ[S.sel];map=`<div class="note"><b>${o.ic} ${o.n}</b> is on ${spotName(o.spot)}, seen ${ago(o.t)}.</div><div style="background:#0e1621;border-radius:12px;padding:4px;margin-top:6px">${planSVG({hl:o.spot,small:true,you:true,objects:false,spots:true})}</div>`}
+    return head('Find things')+`<div class="sub" style="text-align:left;margin-bottom:6px">Tap an item. The cameras saw it last here:</div>`+rows+map},
+  ai(){
+    return head('Ask MemoBand')+`<div class="chat" id="chatlist"></div>
+    <div class="chips">${['Who am I?','Where am I?','Where are my keys?','What is next?','Take me home','How is my heart?'].map(c=>`<button onclick="ask('${c}')">${c}</button>`).join('')}</div>
+    <div class="winput"><input id="aiin" placeholder="Ask me anything…" onkeydown="if(event.key==='Enter')sendAI()"><button onclick="sendAI()">➤</button><button id="micbtn" onclick="mic()">🎤</button></div>`},
+  health(){
+    const G=S.G,st=gaitStatus(),pct=Math.min(100,Math.round(S.steps/S.goal*100));
+    const pts=S.hrHist.map((v,i)=>`${i*5.5},${44-(Math.max(50,Math.min(130,v))-50)*0.5}`).join(' ');
+    return head('My health')+`<div class="hr">❤ ${Math.round(S.hr)} <small>bpm</small></div>
+    <svg viewBox="0 0 215 46" width="100%" style="margin:2px 0"><polyline points="${pts}" fill="none" stroke="#fb7185" stroke-width="2"/></svg>
+    <button class="wbtn sm red" onclick="measureHR()">${S.measuring?'Measuring… '+S.measuring+'s':'Measure heart rate now'}</button>
+    ${S.measured?`<div class="note">${S.measured}</div>`:''}
+    <div class="kv" style="margin-top:8px"><span>👣 Steps</span><b>${S.steps.toLocaleString()} / ${S.goal.toLocaleString()}</b></div><div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="kv"><span>Walking speed</span><b>${G.speed.toFixed(2)} m/s</b></div>
+    <div class="kv"><span>Step symmetry</span><b>${Math.round(G.sym)}%</b></div>
+    <div class="kv"><span>Posture lean</span><b>${G.lean.toFixed(0)}°</b></div>
+    <div class="kv"><span>Gait &amp; posture</span><span class="badge ${st.c}">${st.l}</span></div>
+    <div class="note"><b>MemoBand says:</b><br>${healthAnalysis()}</div>`},
+  map(){
+    if(PERSON.mode==='outside'){
+      const n=navStep();
+      return head('Take me home')+outdoorSVG()+`<div class="note" style="font-size:15px"><b>${distHome()} m to home</b><br>${n.text}</div><button class="wbtn sm" onclick="speak(navStep().text)">🔊 Say it again</button><button class="wbtn alt sm" onclick="callGuide()">📞 Call ${esc(S.profile.guide)}</button>`}
+    const opts=Object.entries(ROOMS).map(([id,r])=>`<button class="wbtn alt sm" onclick="guideTo('${id}')">${r.n}</button>`).join('');
+    const tgt=S.guideTo;
+    let route=null,txt=`You are at home, in the <b>${ROOMS[PERSON.room].n}</b>.`;
+    if(tgt){const c=[ROOMS[tgt].x+ROOMS[tgt].w/2,ROOMS[tgt].y+ROOMS[tgt].h/2];const top=r=>r==='living'||r==='kitchen';route=[[PERSON.x,PERSON.y]];if(top(PERSON.room)!==top(tgt))route.push(HUB);route.push(c);txt=tgt===PERSON.room?`You are already in the <b>${ROOMS[tgt].n}</b>.`:`Follow the green line to the <b>${ROOMS[tgt].n}</b>.`}
+    return head('Where to?')+`<div style="background:#0e1621;border-radius:12px;padding:4px">${planSVG({route,small:true,you:true,objects:false,hlRoom:tgt})}</div><div class="note">${txt}</div><div class="sub" style="margin:8px 0 0">Go to:</div>${opts}`},
+  quiz(){
+    const Q=S.quiz;
+    if(!Q)return head('Memory games')+`<div class="note">A few gentle questions to keep your memory active. There are no wrong answers — just try.</div><button class="wbtn" onclick="startQuiz()">Start (5 questions)</button>`+(S.quizlog.length?`<div class="sub" style="margin-top:10px">Last score: ${S.quizlog[0].score}/${S.quizlog[0].total}</div>`:'');
+    if(Q.done)return head('Well done!')+`<div class="ic" style="text-align:center;font-size:50px">🌟</div><div class="bigtime" style="font-size:36px">${Q.score}/${Q.qs.length}</div><div class="note">Great effort, ${esc(profileName())}! ${esc(S.profile.guide)} will be happy to hear about it.</div><button class="wbtn" onclick="S.quiz=null;go('home')">Done</button>`;
+    const q=Q.qs[Q.i];
+    return head(`Question ${Q.i+1} of ${Q.qs.length}`)+`<div class="note" style="font-size:16px"><b>${esc(q.q)}</b></div>`+q.opts.map((o,k)=>`<button class="opt ${Q.res===null?'':(k===q.ans?'ok':(k===Q.pick?'no':''))}" ${Q.res!==null?'disabled':''} onclick="pickQuiz(${k})">${esc(o)}</button>`).join('')+(Q.res!==null?`<div class="note">${Q.res?'✅ Yes, that is right!':'No worries — it is <b>'+esc(q.opts[q.ans])+'</b>.'}</div><button class="wbtn" onclick="nextQuiz()">Next</button>`:'')}
+};
+function overlayHTML(o){
+  switch(o.kind){
+    case 'routine':return `<div class="ov"><div class="ic shake">${o.r.ic}</div><p>It is ${fmtT(o.r.t)}</p><h2>${esc(o.r.label)}</h2><button class="wbtn" onclick="routineDone(${o.r.id})">✅ Done</button><button class="wbtn alt" onclick="routineLater(${o.r.id})">Remind me in 10 min</button></div>`;
+    case 'memq':{const q=o.q;return `<div class="ov"><div class="ic">🧠</div><p>Quick question, ${esc(profileName())}</p><h2 style="font-size:19px">${esc(q.q)}</h2>${q.opts.map((t,k)=>`<button class="opt ${o.res===null?'':(k===q.ans?'ok':(k===o.pick?'no':''))}" ${o.res!==null?'disabled':''} onclick="pickMem(${k})">${esc(t)}</button>`).join('')}${o.res!==null?`<p style="margin-top:8px">${o.res?'✅ Well done!':'It is '+esc(q.opts[q.ans])+'. That is okay.'}</p><button class="wbtn sm" onclick="closeOv()">OK</button>`:''}</div>`}
+    case 'geo':return `<div class="ov"><div class="ic pulse">📍</div><h2>You are far from home</h2><p>${distHome()} m away. Do not worry — I can guide you back.</p><button class="wbtn" onclick="closeOv();go('map')">🧭 Take me home</button><button class="wbtn alt" onclick="closeOv()">I am fine</button></div>`;
+    case 'fall':return `<div class="ov"><div class="ic pulse">⚠️</div><h2>Are you OK?</h2><div class="bignum">${S.cd}</div><button class="wbtn" onclick="fallOK()">I am OK</button><button class="wbtn red" onclick="fallHelp()">I need help</button></div>`;
+    case 'sosc':return `<div class="ov"><div class="ic pulse">🆘</div><h2>Sending SOS to ${esc(S.profile.guide)}</h2><div class="bignum">${S.cd}</div><button class="wbtn alt" onclick="cancelSOS()">Cancel</button></div>`;
+    case 'soss':return `<div class="ov"><div class="ic">📨</div><h2>Help is coming</h2><p>${esc(S.profile.guide)} knows where you are. Please stay where you are and sit down.</p><button class="wbtn alt" onclick="closeOv()">OK</button></div>`;
+    case 'msg':return `<div class="ov"><div class="ic">💬</div><p>Message from ${esc(o.from)}</p><h2>${esc(o.text)}</h2><button class="wbtn" onclick="closeOv()">OK</button></div>`;
+    case 'home':return `<div class="ov"><div class="ic">🏠</div><h2>Welcome home, ${esc(profileName())}!</h2><p>You are safe at home.</p><button class="wbtn" onclick="closeOv()">OK</button></div>`;
+  }
+  return '';
+}
+function render(){
+  const b=$('wbody'),st=b.scrollTop;
+  b.innerHTML=(S.overlay?overlayHTML(S.overlay):screens[S.screen]());
+  b.scrollTop=st;
+  if(S.screen==='ai'&&!S.overlay)drawChat();
+}
+function go(s){S.screen=s;if(s!=='find')S.sel=null;if(s==='map'&&PERSON.mode!=='outside')S.guideTo=null;render();$('wbody').scrollTop=0}
+function showOv(o){if(S.overlay)S.q.push(o);else{S.overlay=o;render()}}
+function closeOv(){clearCd();S.overlay=S.q.shift()||null;render()}
+function clearCd(){if(S.cdTimer){clearInterval(S.cdTimer);S.cdTimer=null}}
+
+/* ---------- ROUTINE ---------- */
+function toggleDone(id){const r=S.routine.find(x=>x.id===id);r.done=!r.done;render()}
+function saveReminder(){
+  const v=$('nt').value,l=$('nl').value.trim();if(!v||!l){return}
+  const [h,m]=v.split(':').map(Number);const t=h*60+m;
+  S.routine.push({id:S.nextId++,t,label:l,ic:$('ni').value,done:t<S.t%1440,fired:t<S.t%1440,snooze:null,escalated:false});
+  logEv(`Reminder added on watch: ${fmtT(t)} ${l}`);
+  addAlert('info','New routine item added',`${profileName()} added "${l}" at ${fmtT(t)}.`);
+  go('routine');
+}
+function checkRoutine(){
+  const now=S.t%1440;
+  for(const r of S.routine){
+    if(!r.done&&!r.fired&&r.t===now)fireRoutine(r);
+    else if(!r.done&&r.snooze===now){r.snooze=null;fireRoutine(r)}
+    if(r.fired&&!r.done&&!r.escalated&&r.firedAt!=null&&((now-r.firedAt+1440)%1440)>=20&&!(S.overlay&&S.overlay.r===r)){
+      r.escalated=true;addAlert('warn','Routine item missed',`"${r.label}" (${fmtT(r.t)}) has not been confirmed for 20 minutes.`)}
+  }
+  if(now===0)S.routine.forEach(r=>{r.done=false;r.fired=false;r.escalated=false});
+}
+function fireRoutine(r){
+  r.fired=true;r.firedAt=S.t%1440;
+  beep(3);speak(`${profileName()}, it is ${fmtT(r.t).replace(':00','')}. ${r.label}.`);
+  showOv({kind:'routine',r});
+}
+function routineDone(id){const r=S.routine.find(x=>x.id===id);r.done=true;logEv(`Confirmed on watch: ${r.label}`);addAlert('ok','Routine completed',`${profileName()} confirmed "${r.label}" at ${fmtT(S.t)}.`);closeOv()}
+function routineLater(id){const r=S.routine.find(x=>x.id===id);r.snooze=(S.t+10)%1440;closeOv()}
+function jumpNext(){
+  const now=S.t%1440;const r=S.routine.filter(x=>!x.done&&!x.fired&&x.t>now).sort((a,b)=>a.t-b.t)[0];
+  if(!r){S.t=(S.t+60);return}
+  S.t=r.t-1;tick(true);
+}
+
+/* ---------- FIND THINGS ---------- */
+function selFind(id){S.sel=id;const o=OBJ[id];speak(`Your ${o.n.toLowerCase()} are on ${spotName(o.spot)}. I saw them ${ago(o.t)}.`);render()}
+function objAnswer(id){const o=OBJ[id];S.sel=id;return {text:`Your ${o.n.toLowerCase()} ${o.n==='Keys'||o.n==='Glasses'?'are':'is'} on ${spotName(o.spot)} in the ${ROOMS[o.room].n.toLowerCase()}. The camera saw ${o.n==='Keys'||o.n==='Glasses'?'them':'it'} there ${ago(o.t)}.`}}
+
+/* ---------- AI ASSISTANT ---------- */
+function drawChat(){
+  const el=$('chatlist');if(!el)return;
+  if(!S.chat.length)S.chat.push({w:'ai',t:`Hello ${profileName()}, I am MemoBand. You can ask me who you are, where you are, where your things are, or what to do next.`});
+  el.innerHTML=S.chat.map(m=>`<div class="bub ${m.w}">${esc(m.t)}</div>`).join('');
+  $('wbody').scrollTop=$('wbody').scrollHeight;
+}
+function addChat(w,t){S.chat.push({w,t});if(S.screen==='ai'&&!S.overlay)drawChat();if(w==='ai')speak(t)}
+function sendAI(){const i=$('aiin');if(!i||!i.value.trim())return;const v=i.value;i.value='';ask(v)}
+function ask(q){
+  if(S.screen!=='ai'||S.overlay){S.screen='ai';S.overlay=null;render()}
+  addChat('me',q);
+  const a=aiAnswer(q);
+  setTimeout(()=>{addChat('ai',a.text);if(a.act)a.act()},350);
+}
+function mic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){addChat('ai','Voice input is not available here. Please type, or tap one of the suggestions.');return}
+  try{const r=new SR();r.lang='en-US';const b=$('micbtn');b.classList.add('on');
+    r.onresult=e=>ask(e.results[0][0].transcript);
+    r.onerror=()=>{addChat('ai','I could not hear you. Please type or tap a suggestion.')};
+    r.onend=()=>{const x=$('micbtn');if(x)x.classList.remove('on')};r.start()}
+  catch(e){addChat('ai','Voice input is not available here. Please type instead.')}
+}
+function aiAnswer(q){
+  const s=' '+q.toLowerCase().replace(/[?.!,']/g,'')+' ';
+  const has=(...w)=>w.some(x=>s.includes(x));
+  const P=S.profile;
+  for(const [id,o] of Object.entries(OBJ))if(o.syn.some(w=>new RegExp('\\b'+w+'\\b').test(s))&&has('where','find','lost','seen','put','left','looking'))return objAnswer(id);
+  if(has('who am i','my name','who i am','what am i called'))return {text:`You are ${P.name}. You are ${P.age} years old and you live in ${P.city}. ${P.guide} is looking after you and loves you very much.`};
+  if(has('how old'))return {text:`You are ${P.age} years old.`};
+  if(has('where do i live','my address','my home address','where is my home'))return {text:`You live at ${P.address}, ${P.city}.`};
+  if(has('take me home','way home','go home','i am lost','im lost','lost','directions','navigate','get home'))
+    return PERSON.mode==='outside'?{text:`Do not worry. You are ${distHome()} metres from home. I will show you the way — follow the green line on the map.`,act:()=>{go('map')}}:{text:'You are already at home. Tell me which room you want and I will guide you there.',act:()=>{go('map')}};
+  if(has('where am i','where is this'))return PERSON.mode==='outside'?{text:`You are outside, about ${distHome()} metres from your home. I can guide you back.`,act:()=>go('map')}:{text:`You are at home, in the ${ROOMS[PERSON.room].n.toLowerCase()}. You are safe.`};
+  for(const f of P.family)if(has(f.n.toLowerCase())&&has('who','tell me','remind'))return {text:`${f.n} is your ${f.r}.`+(f.n===P.guide?' She looks after you and will come if you press the SOS button.':'')};
+  if(has('who is'))return {text:'I am not sure who you mean. Your family members are '+P.family.map(f=>`${f.n} (${f.r})`).join(', ')+'.'};
+  if(has('what time','time is it'))return {text:`It is ${fmtT(S.t)}.`};
+  if(has('what day','date today','today'))return {text:`Today is ${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}.`};
+  if(has('next','routine','schedule','what should i do','what do i do','plan'))
+    {const r=nextReminder();return r?{text:`Next, at ${fmtT(r.t)}: ${r.label}.`}:{text:'You have nothing planned. You can add things in My day.'}}
+  if(has('heart','pulse'))return {text:`Your heart rate is ${Math.round(S.hr)} beats per minute. ${hrWords(S.hr)}`};
+  if(has('step'))return {text:`You have taken ${S.steps.toLocaleString()} steps today, that is ${Math.round(S.steps/S.goal*100)} percent of your goal.`};
+  if(has('posture','gait','walking','balance','health','how am i'))return {text:healthAnalysis().replace(/<[^>]+>/g,' ')};
+  if(has('help','sos','emergency','scared','afraid','dizzy','pain'))return {text:`I will alert ${P.guide} now. Stay calm, I am here with you.`,act:()=>startSOS()};
+  if(has('hello','hi ','good morning','good evening'))return {text:`Hello ${P.call}. How are you feeling?`};
+  if(has('thank'))return {text:'You are very welcome.'};
+  return {text:`I am here with you, ${P.call}. You can ask me things like "Who am I?", "Where are my keys?" or "Take me home".`};
+}
+
+/* ---------- HEALTH ---------- */
+function hrWords(h){return h>110?'That is a little fast. Please sit down and rest.':h<50?'That is a little slow. Please tell your caregiver.':'That is normal.'}
+function gaitStatus(){const g=S.G;if(g.sym<85||g.speed<.7||g.lean>12)return {c:'r',l:'Concern'};if(g.sym<90||g.speed<.9||g.lean>9)return {c:'a',l:'Watch'};return {c:'g',l:'Good'}}
+function healthAnalysis(){
+  const avg=S.hrHist.slice(-10).reduce((a,b)=>a+b,0)/10,g=S.G,st=gaitStatus(),pct=Math.round(S.steps/S.goal*100),L=[];
+  L.push(`Heart rate ${Math.round(avg)} bpm — ${avg>100?'on the high side, rest a little':avg<55?'on the low side':'in the normal range'}.`);
+  L.push(`${pct}% of today's step goal${pct<50?' — a short walk would help':' — nice work'}.`);
+  L.push(st.c==='g'?'Your walking and posture look steady.':st.c==='a'?'Your steps are slightly uneven. Walk slowly and hold the rail.':'Your walking looks unsteady and you are leaning forward. Please sit down; your caregiver is informed.');
+  return L.join('<br>');
+}
+function measureHR(){
+  if(S.measuring)return;S.measuring=10;S.measured=null;speak('Please keep still while I measure your heart rate.');render();
+  const iv=setInterval(()=>{S.measuring--;if(S.measuring<=0){clearInterval(iv);S.measuring=0;const h=Math.round(S.hr);
+    S.measured=`Result: <b>${h} bpm</b>. ${hrWords(h)} ${PERSON.mode==='walk'?'You are walking, so a higher rate is expected.':''}`;
+    speak(`Your heart rate is ${h} beats per minute. ${hrWords(h)}`);
+    if(h>110||h<50)addAlert('warn','Abnormal heart rate',`${profileName()}: ${h} bpm at ${fmtT(S.t)}.`);}
+    if(S.screen==='health'&&!S.overlay)render()},1000);
+}
+
+/* ---------- NAVIGATION / GUIDE ---------- */
+function guideTo(id){S.guideTo=id;const r=ROOMS[id].n;speak(id===PERSON.room?`You are already in the ${r}.`:`Follow the green line to the ${r}.`);render()}
+function callGuide(){speak(`Calling ${S.profile.guide}.`);addAlert('info','Incoming call from watch',`${profileName()} is calling you from ${locText()}.`)}
+
+/* ---------- MEMORY QUIZ ---------- */
+function buildQuestions(){
+  const P=S.profile,Q=[];
+  const mk=(q,ans,distract)=>{const o=shuffle([ans,...shuffle(distract).slice(0,2)]);return {q,opts:o,ans:o.indexOf(ans)}};
+  Q.push(mk('What is your name?',P.call,['Imran','Bilal','Kamran'].filter(x=>x!==P.call)));
+  if(P.family.length){const f=P.family[Math.floor(Math.random()*P.family.length)];Q.push(mk(`Who is ${f.n}?`,`My ${f.r}`,['My neighbour','My doctor','My teacher','My ' + (f.r==='wife'?'daughter':'wife')].filter(x=>x!=='My '+f.r)))}
+  Q.push(mk('Which city do you live in?',P.city,['Karachi','Islamabad','Multan','Lahore'].filter(x=>x!==P.city)));
+  const id=Object.keys(OBJ)[Math.floor(Math.random()*5)],o=OBJ[id];
+  Q.push(mk(`Where did you put your ${o.n.toLowerCase()}?`,SPOTS[o.spot].n,Object.values(SPOTS).map(s=>s.n).filter(x=>x!==SPOTS[o.spot].n)));
+  const d=new Date().getDay();Q.push(mk('What day is it today?',dayName(d),[dayName(d+1),dayName(d+2),dayName(d-2)]));
+  return Q;
+}
+function startQuiz(){S.quiz={qs:buildQuestions(),i:0,score:0,res:null,pick:null,done:false};render()}
+function pickQuiz(k){const Q=S.quiz,q=Q.qs[Q.i];Q.pick=k;Q.res=(k===q.ans);if(Q.res)Q.score++;speak(Q.res?'Yes, that is right!':`It is ${q.opts[q.ans]}. That is okay.`);render()}
+function nextQuiz(){const Q=S.quiz;Q.i++;Q.res=null;Q.pick=null;if(Q.i>=Q.qs.length){Q.done=true;S.quizlog.unshift({t:S.t,score:Q.score,total:Q.qs.length});logQuiz();addAlert(Q.score<3?'warn':'ok','Memory game finished',`${profileName()} scored ${Q.score}/${Q.qs.length}.`)}render()}
+function simMemCheck(){const q=buildQuestions()[Math.floor(Math.random()*5)];S.lastMemCheck=S.t;beep(2);speak(`${profileName()}, a quick question. ${q.q}`);showOv({kind:'memq',q,res:null,pick:null})}
+function pickMem(k){const o=S.overlay,q=o.q;o.pick=k;o.res=(k===q.ans);S.quizlog.unshift({t:S.t,score:o.res?1:0,total:1,single:true});logQuiz();
+  if(!o.res)addAlert('warn','Memory check missed',`Question: "${q.q}" — answered "${q.opts[k]}" (correct: ${q.opts[q.ans]}).`);
+  speak(o.res?'Well done!':`It is ${q.opts[q.ans]}. That is okay.`);render()}
+function logQuiz(){renderCare()}
+
+/* ---------- SOS / FALL / MESSAGES ---------- */
+function startSOS(){
+  clearCd();S.cd=5;S.overlay=null;S.q=[];S.overlay={kind:'sosc'};render();beep(2);speak('Sending SOS. Press cancel if this was a mistake.');
+  S.cdTimer=setInterval(()=>{S.cd--;if(S.cd<=0){clearCd();sendSOS('SOS button pressed on watch.')}else render()},1000);
+}
+function cancelSOS(){clearCd();S.overlay=null;render()}
+function sendSOS(reason){
+  clearCd();
+  S.sos={t:S.t,reason,loc:locText(),ack:false};
+  addAlert('sos','🆘 SOS from '+profileName(),`${reason} Location: ${locText()}. Heart rate ${Math.round(S.hr)} bpm.`);
+  S.overlay={kind:'soss'};render();speak(`Help is coming. ${S.profile.guide} knows where you are. Please sit down and stay calm.`);
+}
+function ackSOS(){if(!S.sos)return;S.sos.ack=true;addAlert('ok','SOS acknowledged',`${S.profile.guide} is on the way.`);S.sos=null;
+  S.q=[];S.overlay={kind:'msg',from:S.profile.guide,text:'I got your alert. I am coming to you now. Stay where you are.'};render();speak('Sara got your alert. She is coming to you now. Stay where you are.');renderCare()}
+function sendMsg(){const v=$('msg').value.trim();if(!v)return;$('msg').value='';beep(2);speak(`Message from ${S.profile.guide}. ${v}`);showOv({kind:'msg',from:S.profile.guide,text:v});addAlert('info','Message sent to watch',v)}
+function simFall(){
+  if(PERSON.mode==='outside'||PERSON.mode==='fallen')return;
+  PERSON.mode='fallen';PERSON.path=[];PERSON.dest=null;logEv(`⚠️ Fall detected in the ${ROOMS[PERSON.room].n}`);
+  S.q=[];clearCd();S.cd=10;S.overlay={kind:'fall'};render();beep(4);speak(`${profileName()}, are you OK? Press I am OK, or I need help.`);renderAll();
+  S.cdTimer=setInterval(()=>{S.cd--;if(S.cd<=0){clearCd();sendSOS(`Possible fall detected by camera in the ${ROOMS[PERSON.room].n} and no response from ${profileName()}.`)}else render()},1000);
+}
+function fallOK(){clearCd();PERSON.mode='idle';logEv(`${profileName()} confirmed they are OK after the fall alert`);addAlert('info','Fall alert dismissed',`${profileName()} said they are OK.`);S.overlay=null;render();renderAll()}
+function fallHelp(){clearCd();sendSOS(`Fall detected and ${profileName()} asked for help.`)}
+
+/* ---------- WANDERING ---------- */
+function simWander(){
+  if(PERSON.mode==='outside'||PERSON.mode==='fallen')return;
+  PERSON.dest={door:true};PERSON.path=[...(roomTop(PERSON.room)?[HUB]:[]),DOOR];PERSON.mode='walk';logEv(`${profileName()} is heading to the front door`);
+  startAnim();
+}
+function roomTop(r){return r==='living'||r==='kitchen'}
+function leftHouse(){
+  PERSON.mode='outside';PERSON.carry=null;S.wander.prog=0;logEv(`${profileName()} left the house`);
+  setTimeout(()=>{if(PERSON.mode!=='outside')return;
+    addAlert('sos','Left the safe zone',`${profileName()} is outside, about ${distHome()} m from home. Live location is being shared.`);
+    beep(3);speak(`${profileName()}, you are far from home. Do you want me to guide you back?`);showOv({kind:'geo'});renderAll()},2500);
+  renderAll();
+}
+function simWalkHome(){
+  if(PERSON.mode!=='outside'){return}
+  if(S.wander.timer)return;
+  let lastSeg=-1;
+  S.wander.timer=setInterval(()=>{
+    S.wander.prog=Math.min(1,S.wander.prog+.03);
+    const seg=routePos(S.wander.prog).seg;
+    if(seg!==lastSeg){lastSeg=seg;const t=navStep().text;speak(t)}
+    S.steps+=18;
+    if(S.wander.prog>=1){clearInterval(S.wander.timer);S.wander.timer=null;
+      PERSON.mode='idle';PERSON.x=480;PERSON.y=300;PERSON.room='entrance';
+      logEv(`${profileName()} arrived home`);addAlert('ok','Back home safely',`${profileName()} is home again.`);
+      S.q=[];S.overlay={kind:'home'};S.screen='home';render();speak(`Welcome home, ${profileName()}. You are safe.`);}
+    renderAll();if(S.screen==='map'&&!S.overlay)render();
+  },1000);
+}
+
+/* ---------- PERSON MOVEMENT (camera sim) ---------- */
+function fillSelects(){
+  $('selObj').innerHTML=Object.entries(OBJ).map(([id,o])=>`<option value="${id}">${o.ic} ${o.n}</option>`).join('');
+  $('selSpot').innerHTML=Object.entries(SPOTS).map(([id,s])=>`<option value="${id}">${s.n}</option>`).join('');
+}
+function roomAt(x,y){for(const [id,r] of Object.entries(ROOMS))if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return id;return PERSON.room}
+function simWalk(){if(PERSON.mode==='fallen'||PERSON.mode==='outside')return;const id=$('selSpot').value,sp=SPOTS[id];walkPath(sp,{spot:id})}
+function simPlace(){
+  if(PERSON.mode==='fallen'||PERSON.mode==='outside')return;
+  const oid=$('selObj').value,sid=$('selSpot').value,o=OBJ[oid];
+  if(o.spot===sid){logEv(`${o.n} already on ${spotName(sid)}`);return}
+  // walk to the object, pick it up, then carry to the new spot
+  const from=SPOTS[o.spot];
+  walkPath(from,{spot:o.spot,pickup:oid,then:{spot:sid,place:oid}});
+}
+function walkPath(sp,dest){
+  PERSON.path=[...(roomTop(PERSON.room)!==roomTop(sp.room)?[HUB]:[]),[sp.x,sp.y+16]];
+  PERSON.dest=dest;PERSON.mode='walk';startAnim();
+}
+let anim=null,last=0;
+function startAnim(){if(anim)return;last=performance.now();anim=requestAnimationFrame(frame)}
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(PERSON.mode==='walk'&&PERSON.path.length){
+    const sp=PERSON.speed*(S.unsteady?.55:1)*Math.max(1,S.speed/2);
+    let left=sp*dt;
+    while(left>0&&PERSON.path.length){
+      const [tx,ty]=PERSON.path[0],dx=tx-PERSON.x,dy=ty-PERSON.y,d=Math.hypot(dx,dy);
+      if(d<=left){PERSON.x=tx;PERSON.y=ty;PERSON.path.shift();left-=d;S.steps+=Math.round(d/9)}
+      else{PERSON.x+=dx/d*left;PERSON.y+=dy/d*left;S.steps+=left/9;left=0}
+    }
+    PERSON.phase+=dt*(S.unsteady?5:9);
+    const r=roomAt(PERSON.x,PERSON.y);
+    if(r!==PERSON.room&&PERSON.dest&&!PERSON.dest.door){PERSON.room=r;logEv(`${profileName()} entered the ${ROOMS[r].n}`)}else if(r!==PERSON.room){PERSON.room=r}
+    if(!PERSON.path.length)arrive();
+  }
+  document.getElementById('plan').innerHTML=planSVG({objects:true,spots:true});
+  drawStick();
+  if(PERSON.mode==='walk')anim=requestAnimationFrame(frame);else anim=null;
+}
+function arrive(){
+  const d=PERSON.dest;PERSON.mode='idle';PERSON.dest=null;S.steps=Math.round(S.steps);
+  if(!d)return;
+  if(d.door){leftHouse();return}
+  if(d.pickup){PERSON.carry=d.pickup;logEv(`${OBJ[d.pickup].n} picked up from ${spotName(d.spot)}`);
+    const t=d.then;PERSON.path=[...(roomTop(PERSON.room)!==roomTop(SPOTS[t.spot].room)?[HUB]:[]),[SPOTS[t.spot].x,SPOTS[t.spot].y+16]];PERSON.dest=t;PERSON.mode='walk';return}
+  if(d.place){const o=OBJ[d.place];o.spot=d.spot;o.room=SPOTS[d.spot].room;o.t=S.t;PERSON.carry=null;logEv(`📷 ${OBJ[d.place].n} put down on ${spotName(d.spot)}`)}
+}
+function toggleUnsteady(){S.unsteady=!S.unsteady;S.gaitAlerted=false;S.walkTicks=0;const b=$('btnUnsteady');b.textContent='Unsteady gait: '+(S.unsteady?'ON':'off');b.classList.toggle('on',S.unsteady)}
+
+/* ---------- STICK FIGURE / GAIT ---------- */
+function drawStick(){
+  const g=S.G,fall=PERSON.mode==='fallen',walking=PERSON.mode==='walk';
+  const sw=walking?Math.sin(PERSON.phase)*(S.unsteady?10:18):0,asym=S.unsteady&&walking?Math.sin(PERSON.phase*.7)*6:0;
+  const lean=g.lean*(walking?1:.8);
+  const rot=fall?80:lean;
+  const col=gaitStatus().c==='g'?'#16a34a':gaitStatus().c==='a'?'#d97706':'#dc2626';
+  $('stick').innerHTML=`<svg viewBox="0 0 120 160" width="100%"><rect width="120" height="160" rx="10" fill="#0e1621"/>
+  <line x1="10" y1="152" x2="110" y2="152" stroke="#334155"/><line x1="60" y1="20" x2="60" y2="152" stroke="#334155" stroke-dasharray="3 4"/>
+  <g transform="rotate(${rot} 60 ${fall?150:100}) ${fall?'translate(0 0)':''}" stroke="${col}" stroke-width="4" stroke-linecap="round" fill="none">
+   <circle cx="60" cy="24" r="10" fill="${col}" stroke="none"/><line x1="60" y1="35" x2="60" y2="100"/>
+   <line x1="60" y1="48" x2="${38-sw*.6}" y2="82"/><line x1="60" y1="48" x2="${82+sw*.6}" y2="82"/>
+   <line x1="60" y1="100" x2="${46+sw}" y2="150"/><line x1="60" y1="100" x2="${74-sw+asym}" y2="150"/></g></svg>`;
+  const st=gaitStatus();
+  $('gaitInfo').innerHTML=`<div><span class="badge ${st.c}" style="${st.c==='g'?'background:#dcfce7;color:#166534':st.c==='a'?'background:#fef3c7;color:#92400e':'background:#fee2e2;color:#991b1b'}">${fall?'FALL':st.l}</span> ${walking?'walking':'last measured'}</div>
+  <div>Speed: <b>${g.speed.toFixed(2)} m/s</b></div><div>Step symmetry: <b>${Math.round(g.sym)}%</b></div><div>Cadence: <b>${Math.round(g.cad)} steps/min</b></div>
+  <div>Forward lean: <b>${g.lean.toFixed(0)}°</b> ${g.lean>12?'(stooped)':g.lean>9?'(slightly bent)':'(upright)'}</div>
+  <div>Fall risk: <b>${st.c==='g'?'Low':st.c==='a'?'Moderate':'High'}</b></div>`;
+}
+
+/* ---------- CAREGIVER PANEL ---------- */
+function renderCare(){
+  $('guideName').textContent=S.profile.guide;
+  $('sosbanner').innerHTML=S.sos?`<div class="sosb"><b>🆘 SOS — ${esc(profileName())}</b><div style="font-size:13px">${esc(S.sos.reason)}<br>Location: ${esc(S.sos.loc)}</div><button onclick="ackSOS()">Acknowledge &amp; respond</button></div>`:'';
+  $('status').innerHTML=`<div>Location<b>${esc(locText())}</b></div><div>Heart rate<b>${Math.round(S.hr)} bpm</b></div><div>Steps<b>${Math.round(S.steps).toLocaleString()}</b></div><div>Watch battery<b>78%</b></div>`;
+  $('alerts').innerHTML=S.alerts.map(a=>`<div class="al ${a.level}"><b>${esc(a.title)}</b>${esc(a.detail)}<br><span>${fmtT(a.t)}</span></div>`).join('')||'<div style="color:#5b6775;font-size:13px">No alerts yet.</div>';
+  $('quizlog').innerHTML=S.quizlog.map(q=>`<div>${fmtT(q.t)} — ${q.single?'quick check':'game'}: <b>${q.score}/${q.total}</b></div>`).join('')||'No results yet.';
+}
+function saveProfile(){
+  const P=S.profile;P.name=$('pName').value||P.name;P.call=P.name.split(' ')[0];P.age=$('pAge').value;P.city=$('pCity').value;P.address=$('pAddr').value;P.guide=$('pGuide').value||P.guide;
+  P.family=$('pFam').value.split('\n').map(l=>l.split('-')).filter(a=>a[0].trim()).map(a=>({n:a[0].trim(),r:(a[1]||'family').trim()}));
+  S.chat=[];render();renderCare();
+}
+function fillProfile(){const P=S.profile;$('pName').value=P.name;$('pAge').value=P.age;$('pCity').value=P.city;$('pAddr').value=P.address;$('pGuide').value=P.guide;$('pFam').value=P.family.map(f=>f.n+' - '+f.r).join('\n')}
+
+/* ---------- MAIN LOOP ---------- */
+function renderAll(){
+  $('plan').innerHTML=planSVG({objects:true,spots:true});
+  drawStick();renderCare();$('clock').textContent='🕘 '+fmtT(S.t);
+}
+function tick(once){
+  for(let i=0;i<(once?1:S.speed);i++){S.t=(S.t+1)%1440;checkRoutine()}
+  // periodic memory prompt every 3 sim hours when nothing else is happening
+  if(!S.overlay&&PERSON.mode!=='outside'&&PERSON.mode!=='fallen'&&((S.t-S.lastMemCheck+1440)%1440)>=180){simMemCheck()}
+  // physiology
+  const walking=PERSON.mode==='walk'||PERSON.mode==='outside';
+  const tgt=72+(walking?18:0)+(PERSON.mode==='outside'?14:0)+(PERSON.mode==='fallen'?12:0)+(S.sos?10:0);
+  S.hr+=(tgt-S.hr)*.25+rnd(-2,2);S.hrHist.push(S.hr);S.hrHist.shift();
+  const tg=S.unsteady?{speed:.55,sym:76,cad:78,lean:15}:{speed:1.05,sym:94,cad:100,lean:5};
+  const G=S.G;
+  if(walking){for(const k in tg)G[k]+=(tg[k]-G[k])*.3+rnd(-.02,.02)*(k==='speed'?1:20);G.sym=Math.min(99,G.sym);S.walkTicks++;
+    if(S.unsteady&&!S.gaitAlerted&&S.walkTicks>=4){S.gaitAlerted=true;addAlert('warn','Gait change detected',`Reduced step symmetry (${Math.round(G.sym)}%), slow walking and forward lean. Fall risk: moderate. Camera pose analysis at ${fmtT(S.t)}.`);
+      beep(2);speak('Let us slow down. Please sit down if you feel dizzy.');showOv({kind:'msg',from:'MemoBand',text:'Let us walk slowly. Sit down if you feel dizzy.'})}}
+  else if(PERSON.mode==='idle'){G.lean+=(tg.lean*.8-G.lean)*.2}
+  if(PERSON.mode!=='walk'&&PERSON.mode!=='outside')S.walkTicks=0;
+  if(['home','health','map'].includes(S.screen)&&!S.overlay&&!S.measuring)render();
+  $('clock').textContent='🕘 '+fmtT(S.t);
+  if(PERSON.mode!=='walk'){$('plan').innerHTML=planSVG({objects:true,spots:true});drawStick()}
+  renderCare();
+}
+
+
+function toggleDrawer(){$('drawer').classList.toggle('open')}
+function fit(){
+  const k=Math.min(1.7,(innerWidth-8)/310);
+  let h=(innerHeight-46-8)/k-28; h=Math.max(340,Math.min(760,h));
+  document.documentElement.style.setProperty('--h',h+'px');
+  const w=$('watch');w.style.transform='scale('+k+')';
+  $('stage').style.height=(w.offsetHeight*k)+'px';
+}
+addEventListener('resize',fit);fit();
+fillSelects();fillProfile();render();renderAll();renderEvents();
+logEv(`${profileName()} is in the Kitchen`);
+setInterval(()=>tick(false),1000);
+</script>
+</body>
+</html>
