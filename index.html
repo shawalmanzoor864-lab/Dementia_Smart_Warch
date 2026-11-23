@@ -284,7 +284,7 @@ function nextReminder(){
   const now=S.t%1440;let r=S.routine.filter(x=>!x.done&&x.t>=now).sort((a,b)=>a.t-b.t)[0];
   if(!r)r=S.routine.slice().sort((a,b)=>a.t-b.t)[0];return r}
 const screens={
-  ppg(){return `<div class="wh"><button class="back" onclick="ppgCancel()">‹</button><b>Heart rate</b></div><div class="note" id="ppgStat">Starting camera…</div><canvas id="ppgCv" width="215" height="80" style="width:100%;background:#0e1621;border-radius:8px"></canvas><div class="note" style="font-size:11px">Place your fingertip gently over the back camera and flash. Keep still for about 25 seconds.</div>`},
+  ppg(){return `<div class="wh"><button class="back" onclick="ppgCancel()">‹</button><b>Heart rate</b></div><div class="note" id="ppgStat">Starting camera…</div><div class="note" id="ppgDbg" style="font-size:10px;opacity:.8"></div><canvas id="ppgCv" width="215" height="80" style="width:100%;background:#0e1621;border-radius:8px"></canvas><div class="note" style="font-size:11px">Place your fingertip gently over the back camera and flash. Keep still for about 25 seconds.</div>`},
   home(){
     const d=new Date(),nr=nextReminder();
     return `<div class="sub">${d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'})}</div>
@@ -478,17 +478,19 @@ async function measureHR(){
   try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:320},height:{ideal:240},frameRate:{ideal:30,min:15}},audio:false})}
   catch(e){ppgEnd('Camera permission was not given, so heart rate could not be measured.');return}
   const track=stream.getVideoTracks()[0];
-  try{await track.applyConstraints({advanced:[{torch:true}]})}catch(e){}
+  let torch='no';try{await track.applyConstraints({advanced:[{torch:true}]});torch='on'}catch(e){}
   const v=document.createElement('video');v.srcObject=stream;v.muted=true;v.playsInline=true;
   try{await v.play()}catch(e){}
   const c=document.createElement('canvas');c.width=32;c.height=32;const x=c.getContext('2d',{willReadFrequently:true});
-  const P=PPG={stream,ts:[],R:[],G:[],B:[],start:0,lost:0,t0:performance.now(),iv:0,dead:false,lastLive:0,live:null};
+  const P=PPG={stream,ts:[],R:[],G:[],B:[],start:0,lost:0,t0:performance.now(),iv:0,dead:false,lastLive:0,live:null,torch,frames:0,lastDbg:0};
   speak('Place your fingertip over the back camera and keep still.');
   const sample=(nowMs)=>{
     if(P.dead)return;
     x.drawImage(v,0,0,32,32);const px=x.getImageData(8,8,16,16).data;let r=0,g=0,bl=0;const n=px.length/4;
     for(let i=0;i<px.length;i+=4){r+=px[i];g+=px[i+1];bl+=px[i+2]}r/=n;g/=n;bl/=n;
-    const finger=r>70&&r>g*1.25&&r>bl*1.25;
+    P.frames++;
+    if(nowMs-P.lastDbg>500){const d=$('ppgDbg');if(d){const fps=P.ts.length>10?Math.round(P.ts.length/Math.max(.1,P.ts[P.ts.length-1])):0;d.textContent=`R${Math.round(r)} G${Math.round(g)} B${Math.round(bl)} · torch ${P.torch} · ${fps} fps · ${P.lastSnr!=null?'snr '+P.lastSnr.toFixed(2):''}`}P.lastDbg=nowMs}
+    const finger=r>60&&r>g*1.15&&r>bl*1.15;
     if(!finger){
       if(!P.lost)P.lost=nowMs;
       if(nowMs-P.lost>700){P.ts=[];P.R=[];P.G=[];P.B=[];P.start=0;P.live=null;ppgSay((nowMs-P.t0)>8000?'No finger found. Cover the lens AND the flash fully.':'Cover the back camera and flash with your fingertip.')}
@@ -498,12 +500,12 @@ async function measureHR(){
     if(P.ts.length&&el<=P.ts[P.ts.length-1])return; // duplicate frame
     P.ts.push(el);P.R.push(r);P.G.push(g);P.B.push(bl);
     let msg=el<PPG_SETTLE?'Hold still…':'Measuring… '+Math.max(0,Math.ceil(PPG_DUR-el))+'s';
-    if(el>12&&el-P.lastLive>=1){P.lastLive=el;const e=ppgEstimate(P,Math.max(PPG_SETTLE,el-10),el);P.live=e&&e.snr>.3?e.bpm:null}
+    if(el>12&&el-P.lastLive>=1){P.lastLive=el;const e=ppgEstimate(P,Math.max(PPG_SETTLE,el-10),el);P.live=e&&e.snr>.3?e.bpm:null;P.lastSnr=e?e.snr:null}
     if(P.live)msg+='  ≈ '+P.live+' bpm';
     ppgSay(msg);ppgDraw();
     if(el>=PPG_DUR){
       const res=ppgFinal(P);ppgStop();
-      if(!res){ppgEnd('Could not get a clear, steady reading. Press lightly, keep your hand resting on a table, and try again.');return}
+      if(!res){ppgEnd('Could not get a clear, steady reading'+(P.torch==='no'?' (this phone did not allow the flash, so use bright light behind your finger)':'')+'. Press lightly, rest your hand on a table, and try again.');return}
       const h=res.bpm;S.hr=h;S.hrSrc='camera';S.hrAt=S.t;S.hrHist.push(h);S.hrHist.shift();
       S.measured=`Result: <b>${h} bpm</b> (signal ${res.q}). ${hrWords(h)} ${PERSON.mode==='walk'?'You are walking, so a higher rate is expected.':''}`;
       speak(`Your heart rate is ${h} beats per minute. ${hrWords(h)}`);
