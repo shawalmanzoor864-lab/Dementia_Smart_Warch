@@ -190,7 +190,7 @@ const S={
     {id:3,t:660,label:'Drink a glass of water',ic:'💧'},{id:4,t:750,label:'Eat lunch',ic:'🍲'},
     {id:5,t:900,label:'Short walk in the garden',ic:'🚶'},{id:6,t:1080,label:'Call Sara',ic:'📞'},
     {id:7,t:1200,label:'Take evening pills',ic:'💊'},{id:8,t:1320,label:'Go to bed',ic:'🛏️'}],
-  nextId:9, steps:1840, goal:4000, hr:72, hrHist:Array(40).fill(72), measuring:0, measured:null,
+  nextId:9, steps:1840, goal:4000, hr:72, hrHist:Array(40).fill(72), measuring:0, measured:null, hrSrc:'sim', hrAt:0,
   unsteady:false, gaitAlerted:false, walkTicks:0, alerts:[], events:[], quizlog:[], sos:null, lastMemCheck:(new Date().getHours()*60+new Date().getMinutes()),
   G:{speed:1.05,sym:94,cad:100,lean:5}, sel:null, guideTo:null, cd:null, wander:{prog:0,timer:null}
 };
@@ -284,6 +284,7 @@ function nextReminder(){
   const now=S.t%1440;let r=S.routine.filter(x=>!x.done&&x.t>=now).sort((a,b)=>a.t-b.t)[0];
   if(!r)r=S.routine.slice().sort((a,b)=>a.t-b.t)[0];return r}
 const screens={
+  ppg(){return `<div class="wh"><button class="back" onclick="ppgCancel()">‹</button><b>Heart rate</b></div><div class="note" id="ppgStat">Starting camera…</div><canvas id="ppgCv" width="215" height="80" style="width:100%;background:#0e1621;border-radius:8px"></canvas><div class="note" style="font-size:11px">Place your fingertip gently over the back camera and flash. Keep still for about 25 seconds.</div>`},
   home(){
     const d=new Date(),nr=nextReminder();
     return `<div class="sub">${d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'})}</div>
@@ -316,7 +317,9 @@ const screens={
     const pts=S.hrHist.map((v,i)=>`${i*5.5},${44-(Math.max(50,Math.min(130,v))-50)*0.5}`).join(' ');
     return head('My health')+`<div class="hr">❤ ${Math.round(S.hr)} <small>bpm</small></div>
     <svg viewBox="0 0 215 46" width="100%" style="margin:2px 0"><polyline points="${pts}" fill="none" stroke="#fb7185" stroke-width="2"/></svg>
-    <button class="wbtn sm red" onclick="measureHR()">${S.measuring?'Measuring… '+S.measuring+'s':'Measure heart rate now'}</button>
+    <div class="note" style="font-size:11px">${S.hrSrc==='camera'?'Measured with the phone camera at '+fmtT(S.hrAt):S.hrSrc==='ble'?'Live from heart-rate strap':'Demo value, not measured. Use the camera or a strap for a real reading.'}</div>
+    <button class="wbtn sm red" onclick="measureHR()">📷 Measure with camera</button>
+    <button class="wbtn sm alt" onclick="connectStrap()">${S.hrSrc==='ble'?'✅ Strap connected':'🔗 Connect heart-rate strap'}</button>
     ${S.measured?`<div class="note">${S.measured}</div>`:''}
     <div class="kv" style="margin-top:8px"><span>👣 Steps</span><b>${S.steps.toLocaleString()} / ${S.goal.toLocaleString()}</b></div><div class="bar"><i style="width:${pct}%"></i></div>
     <div class="kv"><span>Walking speed</span><b>${G.speed.toFixed(2)} m/s</b></div>
@@ -461,13 +464,93 @@ function healthAnalysis(){
   L.push(st.c==='g'?'Your walking and posture look steady.':st.c==='a'?'Your steps are slightly uneven. Walk slowly and hold the rail.':'Your walking looks unsteady and you are leaning forward. Please sit down; your caregiver is informed.');
   return L.join('<br>');
 }
-function measureHR(){
-  if(S.measuring)return;S.measuring=10;S.measured=null;speak('Please keep still while I measure your heart rate.');render();
-  const iv=setInterval(()=>{S.measuring--;if(S.measuring<=0){clearInterval(iv);S.measuring=0;const h=Math.round(S.hr);
-    S.measured=`Result: <b>${h} bpm</b>. ${hrWords(h)} ${PERSON.mode==='walk'?'You are walking, so a higher rate is expected.':''}`;
-    speak(`Your heart rate is ${h} beats per minute. ${hrWords(h)}`);
-    if(h>110||h<50)addAlert('warn','Abnormal heart rate',`${profileName()}: ${h} bpm at ${fmtT(S.t)}.`);}
-    if(S.screen==='health'&&!S.overlay)render()},1000);
+let PPG=null,BLE=null;
+function ppgSay(t){const e=$('ppgStat');if(e)e.textContent=t}
+function ppgStop(){if(!PPG)return;clearInterval(PPG.iv);try{PPG.stream.getTracks().forEach(t=>t.stop())}catch(e){}PPG=null}
+function ppgCancel(){ppgStop();go('health')}
+function ppgEnd(msg){S.measured=msg;go('health')}
+async function measureHR(){
+  if(PPG)return;S.measured=null;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){S.measured='This browser cannot use the camera here. Open the page in Chrome or Safari over https.';render();return}
+  go('ppg');
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:160},height:{ideal:120},frameRate:{ideal:30}},audio:false})}
+  catch(e){ppgEnd('Camera permission was not given, so heart rate could not be measured.');return}
+  const track=stream.getVideoTracks()[0];
+  try{await track.applyConstraints({advanced:[{torch:true}]})}catch(e){}
+  const v=document.createElement('video');v.srcObject=stream;v.muted=true;v.playsInline=true;
+  try{await v.play()}catch(e){}
+  const c=document.createElement('canvas');c.width=24;c.height=24;const x=c.getContext('2d',{willReadFrequently:true});
+  const DUR=25,SETTLE=4;
+  PPG={stream,data:[],start:0,t0:Date.now(),iv:0};
+  speak('Place your fingertip over the back camera and keep still.');
+  PPG.iv=setInterval(()=>{
+    if(!PPG)return;
+    x.drawImage(v,0,0,24,24);const px=x.getImageData(0,0,24,24).data;let r=0,g=0,n=px.length/4;
+    for(let i=0;i<px.length;i+=4){r+=px[i];g+=px[i+1]}r/=n;g/=n;
+    const now=Date.now();
+    if(!(r>100&&r>g*1.5)){PPG.data=[];PPG.start=0;ppgSay((now-PPG.t0)>8000?'No finger found. Cover the lens AND the flash fully.':'Cover the back camera and flash with your fingertip.');ppgDraw();return}
+    if(!PPG.start)PPG.start=now;
+    const el=(now-PPG.start)/1000;PPG.data.push([el,r]);
+    ppgSay(el<SETTLE?'Hold still…':'Measuring… '+Math.max(0,Math.ceil(DUR-el))+'s');
+    ppgDraw();
+    if(el>=DUR){
+      const d=PPG.data.filter(p=>p[0]>=SETTLE);ppgStop();
+      const h=ppgBpm(d);
+      if(!h){ppgEnd('Could not get a clear reading. Keep your fingertip still, press lightly, and try again.');return}
+      S.hr=h;S.hrSrc='camera';S.hrAt=S.t;S.hrHist.push(h);S.hrHist.shift();
+      S.measured=`Result: <b>${h} bpm</b>. ${hrWords(h)} ${PERSON.mode==='walk'?'You are walking, so a higher rate is expected.':''}`;
+      speak(`Your heart rate is ${h} beats per minute. ${hrWords(h)}`);
+      if(h>110||h<50)addAlert('warn','Abnormal heart rate',`${profileName()}: ${h} bpm at ${fmtT(S.t)}.`);
+      go('health');
+    }
+  },33);
+}
+function ppgDraw(){
+  const cv=$('ppgCv');if(!cv||!PPG)return;const g=cv.getContext('2d');g.clearRect(0,0,215,80);
+  const d=PPG.data.slice(-150);if(d.length<5)return;
+  let mn=1e9,mx=-1e9;d.forEach(p=>{mn=Math.min(mn,p[1]);mx=Math.max(mx,p[1])});const rg=Math.max(1,mx-mn);
+  g.strokeStyle='#fb7185';g.lineWidth=2;g.beginPath();
+  d.forEach((p,i)=>{const X=i*215/150,Y=74-(p[1]-mn)/rg*68;i?g.lineTo(X,Y):g.moveTo(X,Y)});g.stroke();
+}
+function ppgBpm(d){
+  const n=d.length;if(n<150)return null;
+  const fs=n/(d[n-1][0]-d[0][0]);
+  const w=Math.max(3,Math.round(fs*.6));
+  const hp=d.map((p,i)=>{const a=Math.max(0,i-w),b=Math.min(n-1,i+w);let s=0;for(let k=a;k<=b;k++)s+=d[k][1];return p[1]-s/(b-a+1)});
+  const sm=hp.map((_,i)=>{const a=Math.max(0,i-2),b=Math.min(n-1,i+2);let s=0;for(let k=a;k<=b;k++)s+=hp[k];return s/(b-a+1)});
+  const mean=sm.reduce((a,b)=>a+b,0)/n,sd=Math.sqrt(sm.reduce((a,b)=>a+(b-mean)**2,0)/n);
+  if(sd<.05)return null;
+  const peaks=[];
+  for(let i=1;i<n-1;i++){
+    if(sm[i]>sm[i-1]&&sm[i]>=sm[i+1]&&sm[i]>.3*sd){
+      const t=d[i][0],last=peaks[peaks.length-1];
+      if(last&&t-last.t<.33){if(sm[i]>last.v){last.t=t;last.v=sm[i]}}else peaks.push({t,v:sm[i]});
+    }
+  }
+  const iv=[];for(let i=1;i<peaks.length;i++){const dt=peaks[i].t-peaks[i-1].t;if(dt>=.33&&dt<=1.5)iv.push(dt)}
+  if(iv.length<8)return null;
+  iv.sort((a,b)=>a-b);const med=iv[Math.floor(iv.length/2)];
+  const dev=iv.reduce((a,b)=>a+Math.abs(b-med),0)/iv.length;
+  if(dev/med>.2)return null;
+  const bpm=Math.round(60/med);
+  return bpm>=40&&bpm<=180?bpm:null;
+}
+async function connectStrap(){
+  if(!navigator.bluetooth){S.measured='Heart-rate straps need Chrome on Android or desktop (Bluetooth).';render();return}
+  try{
+    const dev=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
+    const srv=await dev.gatt.connect(),svc=await srv.getPrimaryService('heart_rate'),ch=await svc.getCharacteristic('heart_rate_measurement');
+    await ch.startNotifications();
+    ch.addEventListener('characteristicvaluechanged',e=>{
+      const dv=e.target.value,h=(dv.getUint8(0)&1)?dv.getUint16(1,true):dv.getUint8(1);
+      if(h>0){S.hr=h;S.hrSrc='ble';S.hrAt=S.t;
+        if((h>110||h<50)&&(S.hrAlertT==null||((S.t-S.hrAlertT+1440)%1440)>=10)){S.hrAlertT=S.t;addAlert('warn','Abnormal heart rate',`${profileName()}: ${h} bpm at ${fmtT(S.t)}.`)}}
+    });
+    dev.addEventListener('gattserverdisconnected',()=>{if(S.hrSrc==='ble')S.hrSrc='sim';BLE=null});
+    BLE=dev;S.hrSrc='ble';S.measured='Connected to '+(dev.name||'heart-rate sensor')+'. Live heart rate is shown.';
+  }catch(e){S.measured='Could not connect to a heart-rate sensor.'}
+  if(S.screen==='health')render();
 }
 
 /* ---------- NAVIGATION / GUIDE ---------- */
@@ -649,7 +732,7 @@ function loadPatient(i){
   PKEYS.forEach(k=>S[k]=JSON.parse(JSON.stringify(p[k])));
   const now=S.t%1440;
   S.routine.forEach(r=>{r.snooze=null;r.escalated=false;r.firedAt=null;r.done=r.t<now;r.fired=r.t<now});
-  S.chat=[];S.quiz=null;S.overlay=null;S.sos=null;S.screen='home';S.hr=72;S.hrHist=Array(40).fill(72);S.measuring=0;S.measured=null;S.lastMemCheck=now;
+  S.chat=[];S.quiz=null;S.overlay=null;S.sos=null;S.screen='home';S.hr=72;S.hrSrc='sim';ppgStop();try{BLE&&BLE.gatt.disconnect()}catch(e){}S.hrHist=Array(40).fill(72);S.measuring=0;S.measured=null;S.lastMemCheck=now;
   clearCd&&clearCd();
   fillProfile();fillPatSel();render();renderAll();renderEvents();
 }
@@ -694,7 +777,7 @@ function tick(){
   // physiology
   const walking=PERSON.mode==='walk'||PERSON.mode==='outside';
   const tgt=72+(walking?18:0)+(PERSON.mode==='outside'?14:0)+(PERSON.mode==='fallen'?12:0)+(S.sos?10:0);
-  S.hr+=(tgt-S.hr)*.25+rnd(-2,2);S.hrHist.push(S.hr);S.hrHist.shift();
+  if(S.hrSrc==='sim')S.hr+=(tgt-S.hr)*.25+rnd(-2,2);S.hrHist.push(S.hr);S.hrHist.shift();
   const tg=S.unsteady?{speed:.55,sym:76,cad:78,lean:15}:{speed:1.05,sym:94,cad:100,lean:5};
   const G=S.G;
   if(walking){for(const k in tg)G[k]+=(tg[k]-G[k])*.3+rnd(-.02,.02)*(k==='speed'?1:20);G.sym=Math.min(99,G.sym);S.walkTicks++;
