@@ -118,10 +118,8 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none;-webkit-tap-highl
   <div class="dh"><b>Demo controls <small>(not part of the watch)</small></b><button class="sb" onclick="toggleDrawer()">✕ Close</button></div>
   <p class="dn">The watch gets its data from home cameras and sensors. Use these controls to simulate them.</p>
   <div class="ctl" style="margin-bottom:8px">
-    <button class="sb on" data-sp="1" onclick="setSpeed(1)">1×</button>
-    <button class="sb" data-sp="5" onclick="setSpeed(5)">5×</button>
-    <button class="sb" data-sp="15" onclick="setSpeed(15)">15×</button>
-    <button class="sb" onclick="jumpNext()">⏭ Next reminder</button>
+    <span class="sb on" style="pointer-events:none">⏱ Real device time</span>
+    <button class="sb" onclick="jumpNext()">🔔 Test next reminder</button>
     <button class="sb on" id="voiceBtn" onclick="toggleVoice()">🔊 Voice on</button>
   </div>
   <div class="cam"><span class="tag">LIVE · home cameras</span><div id="plan"></div></div>
@@ -146,7 +144,10 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none;-webkit-tap-highl
   <div class="care">
     <input id="msg" placeholder="Message to the watch, e.g. Lunch is ready">
     <button class="sb" onclick="sendMsg()">Send &amp; speak on watch</button>
-    <details style="margin-top:10px"><summary>Patient profile used by the AI</summary>
+    <h4 style="margin-top:12px">Patient</h4>
+    <div class="ctl" style="margin-bottom:6px"><select id="patSel" onchange="switchPatient(+this.value)" style="flex:1"></select>
+      <button class="sb" onclick="newPatient()">＋ New</button><button class="sb" onclick="deletePatient()">🗑</button></div>
+    <details id="profDet" open style="margin-top:6px"><summary>Patient profile used by the AI</summary>
       <label>Name</label><input id="pName" onchange="saveProfile()">
       <label>Age</label><input id="pAge" onchange="saveProfile()">
       <label>City</label><input id="pCity" onchange="saveProfile()">
@@ -181,7 +182,7 @@ const STREETS=['Park Road','Green Park','Market Street','your street'];
 const MPX=2; // metres per map pixel
 
 const S={
-  t:525, speed:1, voice:true, screen:'home', overlay:null, q:[], chat:[], quiz:null,
+  t:(new Date().getHours()*60+new Date().getMinutes()), real:true, speed:1, voice:true, screen:'home', overlay:null, q:[], chat:[], quiz:null,
   profile:{name:'Ahmed Khan',call:'Ahmed',age:72,city:'Lahore',address:'House 12, Street 4, Gulberg',guide:'Sara',
     family:[{n:'Fatima',r:'wife'},{n:'Sara',r:'daughter'},{n:'Ali',r:'grandson'},{n:'Zara',r:'granddaughter'}]},
   routine:[
@@ -190,7 +191,7 @@ const S={
     {id:5,t:900,label:'Short walk in the garden',ic:'🚶'},{id:6,t:1080,label:'Call Sara',ic:'📞'},
     {id:7,t:1200,label:'Take evening pills',ic:'💊'},{id:8,t:1320,label:'Go to bed',ic:'🛏️'}],
   nextId:9, steps:1840, goal:4000, hr:72, hrHist:Array(40).fill(72), measuring:0, measured:null,
-  unsteady:false, gaitAlerted:false, walkTicks:0, alerts:[], events:[], quizlog:[], sos:null, lastMemCheck:525,
+  unsteady:false, gaitAlerted:false, walkTicks:0, alerts:[], events:[], quizlog:[], sos:null, lastMemCheck:(new Date().getHours()*60+new Date().getMinutes()),
   G:{speed:1.05,sym:94,cad:100,lean:5}, sel:null, guideTo:null, cd:null, wander:{prog:0,timer:null}
 };
 S.routine.forEach(r=>{r.done=false;r.fired=false;r.snooze=null;r.escalated=false});
@@ -230,7 +231,7 @@ function beep(n=3){
     for(let i=0;i<n;i++){const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(actx.destination);o.start(actx.currentTime+i*.3);o.stop(actx.currentTime+i*.3+.15)}}catch(e){}
 }
 function toggleVoice(){S.voice=!S.voice;const b=$('voiceBtn');b.textContent=S.voice?'🔊 Voice on':'🔇 Voice off';b.classList.toggle('on',S.voice);if(S.voice)speak('Voice is on.')}
-function setSpeed(n){S.speed=n;document.querySelectorAll('[data-sp]').forEach(b=>b.classList.toggle('on',+b.dataset.sp===n))}
+function setSpeed(n){if(n===0){S.real=true;const d=new Date();S.t=d.getHours()*60+d.getMinutes()}else{S.real=false;S.speed=n}document.querySelectorAll('[data-sp]').forEach(b=>b.classList.toggle('on',+b.dataset.sp===n))}
 
 /* ---------- EVENTS & ALERTS ---------- */
 function logEv(txt){S.events.unshift({t:S.t,txt});if(S.events.length>60)S.events.pop();renderEvents()}
@@ -300,7 +301,7 @@ const screens={
   routine(){
     const rows=S.routine.slice().sort((a,b)=>a.t-b.t).map(r=>`<div class="row ${r.done?'done':''}" onclick="toggleDone(${r.id})"><span class="t">${fmtT(r.t)}</span><span style="font-size:20px">${r.ic}</span><span class="grow">${esc(r.label)}</span><span>${r.done?'✅':'⬜'}</span></div>`).join('');
     return head('My day')+rows+`<button class="wbtn alt sm" onclick="go('addr')">＋ Add to my day</button>`},
-  addr(){return head('Add reminder')+`<input type="time" id="nt" value="${String(Math.floor(S.t/60)%24).padStart(2,'0')}:${String((S.t+5)%60).padStart(2,'0')}"><input type="text" id="nl" placeholder="What to remember?"><select id="ni"><option>💊</option><option>🍳</option><option>💧</option><option>🚶</option><option>📞</option><option>🌳</option><option>🛁</option><option>⏰</option></select><button class="wbtn" onclick="saveReminder()">Save</button>`},
+  addr(){return head('Add reminder')+`<input type="time" id="nt" value="${String(Math.floor(((S.t+5)%1440)/60)).padStart(2,'0')}:${String((S.t+5)%60).padStart(2,'0')}"><input type="text" id="nl" placeholder="What to remember?"><select id="ni"><option>💊</option><option>🍳</option><option>💧</option><option>🚶</option><option>📞</option><option>🌳</option><option>🛁</option><option>⏰</option></select><button class="wbtn" onclick="saveReminder()">Save</button>`},
   find(){
     const rows=Object.entries(OBJ).map(([id,o])=>`<div class="row" onclick="selFind('${id}')"><span style="font-size:24px">${o.ic}</span><span class="grow"><b>${o.n}</b><br><span style="font-size:12px;color:#9fb0c8">${SPOTS[o.spot].n} · ${ago(o.t)}</span></span></div>`).join('');
     let map='';
@@ -391,9 +392,9 @@ function fireRoutine(r){
 function routineDone(id){const r=S.routine.find(x=>x.id===id);r.done=true;logEv(`Confirmed on watch: ${r.label}`);addAlert('ok','Routine completed',`${profileName()} confirmed "${r.label}" at ${fmtT(S.t)}.`);closeOv()}
 function routineLater(id){const r=S.routine.find(x=>x.id===id);r.snooze=(S.t+10)%1440;closeOv()}
 function jumpNext(){
-  const now=S.t%1440;const r=S.routine.filter(x=>!x.done&&!x.fired&&x.t>now).sort((a,b)=>a.t-b.t)[0];
-  if(!r){S.t=(S.t+60);return}
-  S.t=r.t-1;tick(true);
+  // demo only: shows the next reminder now; the clock is never changed
+  const now=S.t%1440;const r=S.routine.filter(x=>!x.done&&x.t>=now).sort((a,b)=>a.t-b.t)[0]||S.routine.find(x=>!x.done);
+  if(r)fireRoutine(r);
 }
 
 /* ---------- FIND THINGS ---------- */
@@ -630,17 +631,64 @@ function renderCare(){
 function saveProfile(){
   const P=S.profile;P.name=$('pName').value||P.name;P.call=P.name.split(' ')[0];P.age=$('pAge').value;P.city=$('pCity').value;P.address=$('pAddr').value;P.guide=$('pGuide').value||P.guide;
   P.family=$('pFam').value.split('\n').map(l=>l.split('-')).filter(a=>a[0].trim()).map(a=>({n:a[0].trim(),r:(a[1]||'family').trim()}));
-  S.chat=[];render();renderCare();
+  S.chat=[];fillPatSel();render();renderCare();savePatients();
 }
 function fillProfile(){const P=S.profile;$('pName').value=P.name;$('pAge').value=P.age;$('pCity').value=P.city;$('pAddr').value=P.address;$('pGuide').value=P.guide;$('pFam').value=P.family.map(f=>f.n+' - '+f.r).join('\n')}
+
+/* ---------- PATIENTS ---------- */
+const PKEYS=['profile','routine','nextId','steps','quizlog','alerts','events'];
+const DEFAULT_ROUTINE=[[540,'Take morning pills','💊'],[570,'Eat breakfast','🍳'],[660,'Drink a glass of water','💧'],[750,'Eat lunch','🍲'],[900,'Short walk in the garden','🚶'],[1080,'Call caregiver','📞'],[1200,'Take evening pills','💊'],[1320,'Go to bed','🛏️']];
+let PAT={list:[],cur:0};
+function snapPatient(){const o={};PKEYS.forEach(k=>o[k]=JSON.parse(JSON.stringify(S[k])));return o}
+function savePatients(){
+  if(PAT.list[PAT.cur])PAT.list[PAT.cur]=snapPatient();
+  try{localStorage.setItem('memoband.patients.v1',JSON.stringify(PAT))}catch(e){}
+}
+function loadPatient(i){
+  const p=PAT.list[i];PAT.cur=i;
+  PKEYS.forEach(k=>S[k]=JSON.parse(JSON.stringify(p[k])));
+  const now=S.t%1440;
+  S.routine.forEach(r=>{r.snooze=null;r.escalated=false;r.firedAt=null;r.done=r.t<now;r.fired=r.t<now});
+  S.chat=[];S.quiz=null;S.overlay=null;S.sos=null;S.screen='home';S.hr=72;S.hrHist=Array(40).fill(72);S.measuring=0;S.measured=null;S.lastMemCheck=now;
+  clearCd&&clearCd();
+  fillProfile();fillPatSel();render();renderAll();renderEvents();
+}
+function fillPatSel(){$('patSel').innerHTML=PAT.list.map((p,i)=>`<option value="${i}" ${i===PAT.cur?'selected':''}>${esc(i===PAT.cur?S.profile.name:p.profile.name)}</option>`).join('')}
+function switchPatient(i){savePatients();loadPatient(i)}
+function newPatient(){
+  savePatients();
+  const id=1;
+  PAT.list.push({profile:{name:'New Patient',call:'New',age:'',city:'',address:'',guide:'Caregiver',family:[]},
+    routine:DEFAULT_ROUTINE.map((a,i)=>({id:i+1,t:a[0],label:a[1],ic:a[2]})),nextId:DEFAULT_ROUTINE.length+1,steps:0,quizlog:[],alerts:[],events:[]});
+  loadPatient(PAT.list.length-1);$('profDet').open=true;$('pName').focus();$('pName').select();
+}
+function deletePatient(){
+  if(PAT.list.length<2){alert('At least one patient is needed.');return}
+  if(!confirm('Delete '+S.profile.name+' and all their data?'))return;
+  PAT.list.splice(PAT.cur,1);loadPatient(0);savePatients();
+}
+function initPatients(){
+  try{const raw=localStorage.getItem('memoband.patients.v1');if(raw){const d=JSON.parse(raw);if(d&&d.list&&d.list.length){PAT=d;if(PAT.cur>=PAT.list.length)PAT.cur=0}}}catch(e){}
+  if(!PAT.list.length){PAT.list=[snapPatient()];PAT.cur=0}
+  loadPatient(PAT.cur);
+}
+setInterval(()=>{try{savePatients()}catch(e){}},5000);
 
 /* ---------- MAIN LOOP ---------- */
 function renderAll(){
   $('plan').innerHTML=planSVG({objects:true,spots:true});
-  drawStick();renderCare();$('clock').textContent='🕘 '+fmtT(S.t);
+  drawStick();renderCare();$('clock').textContent=clockText();
 }
-function tick(once){
-  for(let i=0;i<(once?1:S.speed);i++){S.t=(S.t+1)%1440;checkRoutine()}
+function realMin(){const d=new Date();return d.getHours()*60+d.getMinutes()}
+function clockText(){const d=new Date();return '🕘 '+fmtT(realMin()).replace(' ',':'+String(d.getSeconds()).padStart(2,'0')+' ')}
+function tick(){
+  // the watch clock follows the real device clock; a reminder fires only in the minute it is set for
+  const nowM=realMin();
+  if(S.t!==nowM){
+    const gap=(nowM-S.t+1440)%1440;
+    if(gap>5){S.t=(nowM-1+1440)%1440} // phone was asleep: do not replay old reminders
+    while(S.t!==nowM){S.t=(S.t+1)%1440;checkRoutine()}
+  }
   // periodic memory prompt every 3 sim hours when nothing else is happening
   if(!S.overlay&&PERSON.mode!=='outside'&&PERSON.mode!=='fallen'&&((S.t-S.lastMemCheck+1440)%1440)>=180){simMemCheck()}
   // physiology
@@ -655,7 +703,7 @@ function tick(once){
   else if(PERSON.mode==='idle'){G.lean+=(tg.lean*.8-G.lean)*.2}
   if(PERSON.mode!=='walk'&&PERSON.mode!=='outside')S.walkTicks=0;
   if(['home','health','map'].includes(S.screen)&&!S.overlay&&!S.measuring)render();
-  $('clock').textContent='🕘 '+fmtT(S.t);
+  $('clock').textContent=clockText();
   if(PERSON.mode!=='walk'){$('plan').innerHTML=planSVG({objects:true,spots:true});drawStick()}
   renderCare();
 }
@@ -670,9 +718,9 @@ function fit(){
   $('stage').style.height=(w.offsetHeight*k)+'px';
 }
 addEventListener('resize',fit);fit();
-fillSelects();fillProfile();render();renderAll();renderEvents();
+fillSelects();initPatients();
 logEv(`${profileName()} is in the Kitchen`);
-setInterval(()=>tick(false),1000);
+setInterval(()=>tick(),1000);
 </script>
 </body>
 </html>
