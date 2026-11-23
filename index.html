@@ -466,75 +466,116 @@ function healthAnalysis(){
 }
 let PPG=null,BLE=null;
 function ppgSay(t){const e=$('ppgStat');if(e)e.textContent=t}
-function ppgStop(){if(!PPG)return;clearInterval(PPG.iv);try{PPG.stream.getTracks().forEach(t=>t.stop())}catch(e){}PPG=null}
+function ppgStop(){if(!PPG)return;PPG.dead=true;clearInterval(PPG.iv);try{PPG.stream.getTracks().forEach(t=>t.stop())}catch(e){}PPG=null}
 function ppgCancel(){ppgStop();go('health')}
 function ppgEnd(msg){S.measured=msg;go('health')}
+const PPG_DUR=32,PPG_SETTLE=5;
 async function measureHR(){
   if(PPG)return;S.measured=null;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){S.measured='This browser cannot use the camera here. Open the page in Chrome or Safari over https.';render();return}
   go('ppg');
   let stream;
-  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:160},height:{ideal:120},frameRate:{ideal:30}},audio:false})}
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:320},height:{ideal:240},frameRate:{ideal:30,min:15}},audio:false})}
   catch(e){ppgEnd('Camera permission was not given, so heart rate could not be measured.');return}
   const track=stream.getVideoTracks()[0];
   try{await track.applyConstraints({advanced:[{torch:true}]})}catch(e){}
   const v=document.createElement('video');v.srcObject=stream;v.muted=true;v.playsInline=true;
   try{await v.play()}catch(e){}
-  const c=document.createElement('canvas');c.width=24;c.height=24;const x=c.getContext('2d',{willReadFrequently:true});
-  const DUR=25,SETTLE=4;
-  PPG={stream,data:[],start:0,t0:Date.now(),iv:0};
+  const c=document.createElement('canvas');c.width=32;c.height=32;const x=c.getContext('2d',{willReadFrequently:true});
+  const P=PPG={stream,ts:[],R:[],G:[],B:[],start:0,lost:0,t0:performance.now(),iv:0,dead:false,lastLive:0,live:null};
   speak('Place your fingertip over the back camera and keep still.');
-  PPG.iv=setInterval(()=>{
-    if(!PPG)return;
-    x.drawImage(v,0,0,24,24);const px=x.getImageData(0,0,24,24).data;let r=0,g=0,n=px.length/4;
-    for(let i=0;i<px.length;i+=4){r+=px[i];g+=px[i+1]}r/=n;g/=n;
-    const now=Date.now();
-    if(!(r>100&&r>g*1.5)){PPG.data=[];PPG.start=0;ppgSay((now-PPG.t0)>8000?'No finger found. Cover the lens AND the flash fully.':'Cover the back camera and flash with your fingertip.');ppgDraw();return}
-    if(!PPG.start)PPG.start=now;
-    const el=(now-PPG.start)/1000;PPG.data.push([el,r]);
-    ppgSay(el<SETTLE?'Hold still…':'Measuring… '+Math.max(0,Math.ceil(DUR-el))+'s');
-    ppgDraw();
-    if(el>=DUR){
-      const d=PPG.data.filter(p=>p[0]>=SETTLE);ppgStop();
-      const h=ppgBpm(d);
-      if(!h){ppgEnd('Could not get a clear reading. Keep your fingertip still, press lightly, and try again.');return}
-      S.hr=h;S.hrSrc='camera';S.hrAt=S.t;S.hrHist.push(h);S.hrHist.shift();
-      S.measured=`Result: <b>${h} bpm</b>. ${hrWords(h)} ${PERSON.mode==='walk'?'You are walking, so a higher rate is expected.':''}`;
+  const sample=(nowMs)=>{
+    if(P.dead)return;
+    x.drawImage(v,0,0,32,32);const px=x.getImageData(8,8,16,16).data;let r=0,g=0,bl=0;const n=px.length/4;
+    for(let i=0;i<px.length;i+=4){r+=px[i];g+=px[i+1];bl+=px[i+2]}r/=n;g/=n;bl/=n;
+    const finger=r>70&&r>g*1.25&&r>bl*1.25;
+    if(!finger){
+      if(!P.lost)P.lost=nowMs;
+      if(nowMs-P.lost>700){P.ts=[];P.R=[];P.G=[];P.B=[];P.start=0;P.live=null;ppgSay((nowMs-P.t0)>8000?'No finger found. Cover the lens AND the flash fully.':'Cover the back camera and flash with your fingertip.')}
+      ppgDraw();return}
+    P.lost=0;if(!P.start)P.start=nowMs;
+    const el=(nowMs-P.start)/1000;
+    if(P.ts.length&&el<=P.ts[P.ts.length-1])return; // duplicate frame
+    P.ts.push(el);P.R.push(r);P.G.push(g);P.B.push(bl);
+    let msg=el<PPG_SETTLE?'Hold still…':'Measuring… '+Math.max(0,Math.ceil(PPG_DUR-el))+'s';
+    if(el>12&&el-P.lastLive>=1){P.lastLive=el;const e=ppgEstimate(P,Math.max(PPG_SETTLE,el-10),el);P.live=e&&e.snr>.3?e.bpm:null}
+    if(P.live)msg+='  ≈ '+P.live+' bpm';
+    ppgSay(msg);ppgDraw();
+    if(el>=PPG_DUR){
+      const res=ppgFinal(P);ppgStop();
+      if(!res){ppgEnd('Could not get a clear, steady reading. Press lightly, keep your hand resting on a table, and try again.');return}
+      const h=res.bpm;S.hr=h;S.hrSrc='camera';S.hrAt=S.t;S.hrHist.push(h);S.hrHist.shift();
+      S.measured=`Result: <b>${h} bpm</b> (signal ${res.q}). ${hrWords(h)} ${PERSON.mode==='walk'?'You are walking, so a higher rate is expected.':''}`;
       speak(`Your heart rate is ${h} beats per minute. ${hrWords(h)}`);
       if(h>110||h<50)addAlert('warn','Abnormal heart rate',`${profileName()}: ${h} bpm at ${fmtT(S.t)}.`);
       go('health');
     }
-  },33);
+  };
+  if('requestVideoFrameCallback' in v){const cb=(now)=>{if(P.dead)return;sample(now);v.requestVideoFrameCallback(cb)};v.requestVideoFrameCallback(cb)}
+  else P.iv=setInterval(()=>sample(performance.now()),33);
 }
 function ppgDraw(){
   const cv=$('ppgCv');if(!cv||!PPG)return;const g=cv.getContext('2d');g.clearRect(0,0,215,80);
-  const d=PPG.data.slice(-150);if(d.length<5)return;
-  let mn=1e9,mx=-1e9;d.forEach(p=>{mn=Math.min(mn,p[1]);mx=Math.max(mx,p[1])});const rg=Math.max(1,mx-mn);
+  const N=Math.min(PPG.ts.length,180);if(N<20)return;
+  const sig=ppgPick(PPG,PPG.ts.length-N,PPG.ts.length);if(!sig)return;
+  const pr=ppgPrep(sig,30);let mn=1e9,mx=-1e9;pr.forEach(v=>{mn=Math.min(mn,v);mx=Math.max(mx,v)});const rg=Math.max(1e-6,mx-mn);
   g.strokeStyle='#fb7185';g.lineWidth=2;g.beginPath();
-  d.forEach((p,i)=>{const X=i*215/150,Y=74-(p[1]-mn)/rg*68;i?g.lineTo(X,Y):g.moveTo(X,Y)});g.stroke();
+  pr.forEach((p,i)=>{const X=i*215/pr.length,Y=74-(p-mn)/rg*68;i?g.lineTo(X,Y):g.moveTo(X,Y)});g.stroke();
 }
-function ppgBpm(d){
-  const n=d.length;if(n<150)return null;
-  const fs=n/(d[n-1][0]-d[0][0]);
-  const w=Math.max(3,Math.round(fs*.6));
-  const hp=d.map((p,i)=>{const a=Math.max(0,i-w),b=Math.min(n-1,i+w);let s=0;for(let k=a;k<=b;k++)s+=d[k][1];return p[1]-s/(b-a+1)});
-  const sm=hp.map((_,i)=>{const a=Math.max(0,i-2),b=Math.min(n-1,i+2);let s=0;for(let k=a;k<=b;k++)s+=hp[k];return s/(b-a+1)});
-  const mean=sm.reduce((a,b)=>a+b,0)/n,sd=Math.sqrt(sm.reduce((a,b)=>a+(b-mean)**2,0)/n);
-  if(sd<.05)return null;
-  const peaks=[];
-  for(let i=1;i<n-1;i++){
-    if(sm[i]>sm[i-1]&&sm[i]>=sm[i+1]&&sm[i]>.3*sd){
-      const t=d[i][0],last=peaks[peaks.length-1];
-      if(last&&t-last.t<.33){if(sm[i]>last.v){last.t=t;last.v=sm[i]}}else peaks.push({t,v:sm[i]});
-    }
+function ppgPick(P,i0,i1){ // best unsaturated channel for a slice, as uniform 30 Hz? (raw for drawing)
+  let best=null;
+  for(const ch of ['R','G','B']){
+    const arr=P[ch].slice(i0,i1);if(arr.length<5)continue;
+    const m=arr.reduce((a,b)=>a+b,0)/arr.length;const sd=Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length);
+    if(m>=250||sd<.03)continue;
+    if(!best||sd>best.sd)best={arr,sd}
   }
-  const iv=[];for(let i=1;i<peaks.length;i++){const dt=peaks[i].t-peaks[i-1].t;if(dt>=.33&&dt<=1.5)iv.push(dt)}
-  if(iv.length<8)return null;
-  iv.sort((a,b)=>a-b);const med=iv[Math.floor(iv.length/2)];
-  const dev=iv.reduce((a,b)=>a+Math.abs(b-med),0)/iv.length;
-  if(dev/med>.2)return null;
-  const bpm=Math.round(60/med);
-  return bpm>=40&&bpm<=180?bpm:null;
+  return best?best.arr:null;
+}
+function ppgResample(ts,vals,fs){
+  const t0=ts[0],n=Math.floor((ts[ts.length-1]-t0)*fs),out=new Array(n);let j=0;
+  for(let i=0;i<n;i++){const t=t0+i/fs;while(j<ts.length-2&&ts[j+1]<t)j++;const a=ts[j],b=ts[j+1],u=b>a?Math.min(1,Math.max(0,(t-a)/(b-a))):0;out[i]=vals[j]+(vals[j+1]-vals[j])*u}
+  return out;
+}
+function ppgPrep(sig,fs){
+  const n=sig.length,w=Math.max(2,Math.round(fs*.8)),pre=[0];
+  for(let i=0;i<n;i++)pre.push(pre[i]+sig[i]);
+  const hp=sig.map((v,i)=>{const a=Math.max(0,i-w),b=Math.min(n-1,i+w);return v-(pre[b+1]-pre[a])/(b-a+1)});
+  return hp.map((_,i)=>{const a=Math.max(0,i-1),b=Math.min(n-1,i+1);let s=0;for(let k=a;k<=b;k++)s+=hp[k];return s/(b-a+1)});
+}
+function ppgSpec(x,fs){
+  const n=x.length;if(n<fs*6)return null;
+  const win=x.map((v,i)=>v*(.5-.5*Math.cos(2*Math.PI*i/(n-1))));
+  const F=[],Pw=[];let tot=0;
+  for(let f=.7;f<=3.0001;f+=.01){let re=0,im=0;const wv=2*Math.PI*f/fs;for(let i=0;i<n;i++){re+=win[i]*Math.cos(wv*i);im+=win[i]*Math.sin(wv*i)}F.push(f);Pw.push(re*re+im*im);tot+=re*re+im*im}
+  if(tot<=0)return null;
+  let k=0;for(let i=1;i<Pw.length;i++)if(Pw[i]>Pw[k])k=i;
+  // slow-peak guard: a strong half-frequency peak means we locked on a harmonic
+  if(F[k]>1.7){const t=Math.round((F[k]/2-.7)/.01);if(t>=0&&t<Pw.length){let m=t;for(let i=Math.max(0,t-4);i<=Math.min(Pw.length-1,t+4);i++)if(Pw[i]>Pw[m])m=i;if(Pw[m]>.6*Pw[k])k=m}}
+  let f0=F[k];
+  if(k>0&&k<Pw.length-1){const a=Pw[k-1],b=Pw[k],c=Pw[k+1],d=a-2*b+c;if(d<0)f0+=.01*.5*(a-c)/d}
+  let sp=0;for(let i=0;i<F.length;i++)if(Math.abs(F[i]-f0)<=.1||Math.abs(F[i]-2*f0)<=.1)sp+=Pw[i];
+  return {bpm:Math.round(f0*60),snr:sp/tot};
+}
+function ppgEstimate(P,t0,t1){
+  const i0=P.ts.findIndex(t=>t>=t0);if(i0<0)return null;
+  let i1=P.ts.length;if(t1<P.ts[P.ts.length-1])i1=P.ts.findIndex(t=>t>t1);
+  if(i1-i0<30)return null;
+  const ts=P.ts.slice(i0,i1);let best=null;
+  for(const ch of ['R','G','B']){
+    const arr=P[ch].slice(i0,i1),m=arr.reduce((a,b)=>a+b,0)/arr.length,sd=Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length);
+    if(m>=250||sd<.03)continue;
+    const r=ppgSpec(ppgPrep(ppgResample(ts,arr,30),30),30);
+    if(r&&(!best||r.snr>best.snr))best=r;
+  }
+  return best;
+}
+function ppgFinal(P){
+  const end=P.ts[P.ts.length-1];
+  const all=ppgEstimate(P,PPG_SETTLE,end),h1=ppgEstimate(P,PPG_SETTLE,PPG_SETTLE+15),h2=ppgEstimate(P,end-15,end);
+  if(!all||!h1||!h2)return null;
+  if(all.snr<.3||Math.abs(h1.bpm-h2.bpm)>7||Math.abs(all.bpm-(h1.bpm+h2.bpm)/2)>5)return null;
+  return {bpm:all.bpm,q:all.snr>.55?'good':'fair'};
 }
 async function connectStrap(){
   if(!navigator.bluetooth){S.measured='Heart-rate straps need Chrome on Android or desktop (Bluetooth).';render();return}
